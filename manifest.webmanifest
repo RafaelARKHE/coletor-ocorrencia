@@ -1,0 +1,15 @@
+{
+  "name": "Coletor de Ocorrência — 3º GBM",
+  "short_name": "Coletor",
+  "description": "Captura na cena: coleta guiada de dados e áudio por ocorrência, exporta pacote para o Nexus.",
+  "start_url": "./coletor.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e0e10",
+  "theme_color": "#0e0e10",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

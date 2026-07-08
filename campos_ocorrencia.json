@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "sistema": "Nexus",
+    "descricao": "Schema adaptativo do Coletor de Ocorrência: superset de papéis/campos exigidos pelo minuto a minuto (e alinhado ao SINESP), com o mapa tipo→o que acende. O coletor.html embute uma cópia deste schema; este arquivo é a referência canônica lida pelo Nexus na ingestão.",
+    "versao": "1.0",
+    "criado_em": "08/07/2026",
+    "fonte_naturezas": "Nexus_Obsidian/Operacional/naturezas_sinesp.md"
+  },
+
+  "funcoes": [
+    { "id": "guarnicao_resgate", "rotulo": "Guarnição de resgate (AR)" },
+    { "id": "guarnicao_incendio", "rotulo": "Guarnição de incêndio (ABT)" },
+    { "id": "outro", "rotulo": "Outra função" }
+  ],
+
+  "papeis": {
+    "solicitante":  { "rotulo": "Solicitante",        "campos": ["nome", "cpf", "contato"] },
+    "vitima":       { "rotulo": "Vítima / Paciente",  "campos": ["nome", "idade", "cpf", "estado_vitima", "destino"], "multiplo": true },
+    "condutor":     { "rotulo": "Condutor envolvido", "campos": ["nome", "cpf", "veiculo_placa", "veiculo_modelo"], "multiplo": true },
+    "testemunha":   { "rotulo": "Testemunha",         "campos": ["nome", "cpf"], "multiplo": true },
+    "proprietario": { "rotulo": "Proprietário do bem","campos": ["nome", "cpf"] },
+    "apoio_samu":   { "rotulo": "Apoio SAMU",         "campos": ["usb_numero", "equipe"] },
+    "apoio_pm":     { "rotulo": "Apoio PM",           "campos": ["batalhao", "vtr_pm", "equipe"] },
+    "apoio_outro":  { "rotulo": "Apoio externo (concessionária etc.)", "campos": ["orgao", "equipe"], "multiplo": true },
+    "relato":       { "rotulo": "Relato do ocorrido", "campos": ["texto_livre"] }
+  },
+
+  "campos": {
+    "nome":            { "rotulo": "Nome completo" },
+    "cpf":             { "rotulo": "CPF" },
+    "idade":           { "rotulo": "Idade" },
+    "contato":         { "rotulo": "Telefone de contato", "opcional": true },
+    "estado_vitima":   { "rotulo": "Estado da vítima (consciente? lesões?)" },
+    "destino":         { "rotulo": "Destino/encaminhamento (hospital, SAMU…)", "opcional": true },
+    "veiculo_placa":   { "rotulo": "Placa do veículo" },
+    "veiculo_modelo":  { "rotulo": "Modelo/cor do veículo", "opcional": true },
+    "usb_numero":      { "rotulo": "Nº da USB do SAMU" },
+    "equipe":          { "rotulo": "Nomes da equipe" },
+    "batalhao":        { "rotulo": "Batalhão (ex.: 37º BPM)" },
+    "vtr_pm":          { "rotulo": "VTR da PM", "opcional": true },
+    "orgao":           { "rotulo": "Órgão/empresa (nomear a instituição)" },
+    "texto_livre":     { "rotulo": "O que aconteceu, na ordem" }
+  },
+
+  "tipos": [
+    {
+      "id": "acidente_transito_com_vitima",
+      "rotulo": "Acidente de trânsito com vítima",
+      "natureza_sinesp": "SINISTRO DE TRÂNSITO",
+      "papeis": ["solicitante", "vitima", "condutor", "testemunha", "apoio_samu", "apoio_pm", "relato"]
+    },
+    {
+      "id": "incendio_residencia",
+      "rotulo": "Incêndio em edificação/residência",
+      "natureza_sinesp": "INCÊNDIO",
+      "papeis": ["solicitante", "vitima", "proprietario", "testemunha", "apoio_pm", "apoio_outro", "relato"]
+    },
+    {
+      "id": "fogo_veiculo",
+      "rotulo": "Fogo em veículo",
+      "natureza_sinesp": "INCÊNDIO",
+      "papeis": ["solicitante", "proprietario", "testemunha", "apoio_pm", "relato"]
+    },
+    {
+      "id": "fogo_poste_fiacao",
+      "rotulo": "Fogo em poste / fiação",
+      "natureza_sinesp": "INCÊNDIO",
+      "papeis": ["solicitante", "apoio_outro", "relato"]
+    },
+    {
+      "id": "apoio_samu_clinico",
+      "rotulo": "Apoio ao SAMU (clínico/psiquiátrico)",
+      "natureza_sinesp": "APOIO",
+      "papeis": ["solicitante", "vitima", "apoio_samu", "apoio_pm", "relato"]
+    },
+    {
+      "id": "salvamento",
+      "rotulo": "Busca e salvamento",
+      "natureza_sinesp": "BUSCA E SALVAMENTO",
+      "papeis": ["solicitante", "vitima", "testemunha", "apoio_samu", "apoio_pm", "relato"]
+    },
+    {
+      "id": "corte_objetos",
+      "rotulo": "Corte de objetos (anel preso etc.)",
+      "natureza_sinesp": "CORTE DE OBJETOS",
+      "papeis": ["vitima", "relato"]
+    },
+    {
+      "id": "outra",
+      "rotulo": "Outra (descrever no relato)",
+      "natureza_sinesp": null,
+      "papeis": ["solicitante", "vitima", "testemunha", "apoio_samu", "apoio_pm", "apoio_outro", "relato"]
+    }
+  ],
+
+  "marcos": ["deslocamento", "chegada", "termino"]
+}

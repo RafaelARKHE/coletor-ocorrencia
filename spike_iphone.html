@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 08/07/2026 | versao: 1.0 -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Spike iPhone — Coletor Nexus</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, system-ui, sans-serif; padding: 16px; max-width: 560px; margin: 0 auto; background: #111; color: #eee; }
+  h1 { font-size: 1.2rem; margin-bottom: 4px; }
+  p.sub { color: #999; font-size: .85rem; margin-bottom: 16px; }
+  .card { background: #1d1d1f; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 1rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .status { font-size: .8rem; padding: 2px 8px; border-radius: 8px; background: #444; }
+  .ok    { background: #1d6b32; }
+  .fail  { background: #8b2020; }
+  .warn  { background: #8a6d1a; }
+  button { font-size: 1rem; padding: 12px 16px; border-radius: 10px; border: none; background: #2f6fed; color: #fff; width: 100%; margin-top: 8px; }
+  button:active { opacity: .7; }
+  button.rec { background: #c22; }
+  pre { font-size: .75rem; white-space: pre-wrap; word-break: break-all; color: #9c9; margin-top: 8px; }
+  audio { width: 100%; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>🧪 Spike — Coletor de Ocorrência</h1>
+<p class="sub">Teste no Safari do iPhone, de preferência em <b>modo avião</b> (após carregar a página). Cada cartão mostra ✅/❌.</p>
+
+<div class="card" id="diag">
+  <h2>0. Ambiente <span class="status" id="s-env">checando…</span></h2>
+  <pre id="o-env"></pre>
+</div>
+
+<div class="card">
+  <h2>1. Gravação de áudio <span class="status" id="s-rec">pendente</span></h2>
+  <button id="b-rec">🎙️ Gravar 5 s</button>
+  <audio id="a-play" controls hidden></audio>
+  <pre id="o-rec"></pre>
+</div>
+
+<div class="card">
+  <h2>2. Persistência offline <span class="status" id="s-db">pendente</span></h2>
+  <button id="b-db">💾 Salvar áudio no IndexedDB e reler</button>
+  <pre id="o-db">Grave o áudio primeiro (teste 1).</pre>
+</div>
+
+<div class="card">
+  <h2>3. Geolocalização <span class="status" id="s-geo">pendente</span></h2>
+  <button id="b-geo">📍 Pegar coordenada (teste com e sem sinal)</button>
+  <pre id="o-geo"></pre>
+</div>
+
+<div class="card">
+  <h2>4. Transcrição on-device <span class="status" id="s-stt">pendente</span></h2>
+  <button id="b-stt">🗣️ Falar e transcrever (10 s)</button>
+  <pre id="o-stt"></pre>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const set = (id, cls, txt) => { const el = $(id); el.className = 'status ' + cls; el.textContent = txt; };
+let gravado = null; // Blob
+
+// ---- 0. Diagnóstico de ambiente (a causa mais provável de falha no iPhone) ----
+(() => {
+  const seguro = window.isSecureContext;
+  const temMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  const temRec = !!window.MediaRecorder;
+  const temGeo = !!navigator.geolocation;
+  const temSTT = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  $('o-env').textContent =
+    `contexto seguro (HTTPS): ${seguro ? 'SIM ✅' : 'NÃO ❌'}\n` +
+    `protocolo: ${location.protocol}   host: ${location.host || '(arquivo local)'}\n` +
+    `navigator.mediaDevices: ${temMedia ? 'ok' : 'AUSENTE ❌'}\n` +
+    `MediaRecorder: ${temRec ? 'ok' : 'AUSENTE ❌'}\n` +
+    `geolocation: ${temGeo ? 'ok' : 'AUSENTE ❌'}\n` +
+    `SpeechRecognition: ${temSTT ? 'ok' : 'ausente (transcrição on-device indisponível)'}\n` +
+    (seguro ? '' : '\n⚠️ SEM HTTPS o iOS bloqueia microfone e GPS mesmo pedindo permissão.\n   Abra por um endereço https:// (ver instruções do Nexus).');
+  set('s-env', seguro && temMedia ? 'ok' : 'fail', seguro && temMedia ? '✅ ok' : '❌ inseguro');
+})();
+
+// ---- 1. MediaRecorder ----
+$('b-rec').onclick = async () => {
+  const out = $('o-rec'), btn = $('b-rec');
+  try {
+    if (!window.isSecureContext) throw new Error('Contexto inseguro (sem HTTPS) — iOS bloqueia o microfone. Abra por https://');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('getUserMedia ausente — provável falta de HTTPS no iOS');
+    if (!window.MediaRecorder) throw new Error('MediaRecorder não existe neste navegador');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = ['audio/mp4', 'audio/webm', 'audio/aac', ''].find(m => m === '' || MediaRecorder.isTypeSupported(m));
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      gravado = new Blob(chunks, { type: rec.mimeType });
+      const url = URL.createObjectURL(gravado);
+      $('a-play').src = url; $('a-play').hidden = false;
+      out.textContent = `mimeType: ${rec.mimeType}\ntamanho: ${gravado.size} bytes`;
+      set('s-rec', gravado.size > 0 ? 'ok' : 'fail', gravado.size > 0 ? '✅ OK' : '❌ vazio');
+      btn.textContent = '🎙️ Gravar 5 s'; btn.className = '';
+    };
+    rec.start(1000); // timeslice: iOS entrega dados a cada 1s (sem isso pode vir vazio)
+    btn.textContent = '⏺️ Gravando…'; btn.className = 'rec';
+    setTimeout(() => rec.state !== 'inactive' && rec.stop(), 5000);
+  } catch (e) { out.textContent = 'ERRO: ' + e.message; set('s-rec', 'fail', '❌ falhou'); }
+};
+
+// ---- 2. IndexedDB ----
+$('b-db').onclick = () => {
+  const out = $('o-db');
+  if (!gravado) { out.textContent = 'Grave o áudio primeiro (teste 1).'; return; }
+  const req = indexedDB.open('spike_nexus', 1);
+  req.onupgradeneeded = () => req.result.createObjectStore('audios');
+  req.onerror = () => { out.textContent = 'ERRO abrir DB: ' + req.error; set('s-db', 'fail', '❌'); };
+  req.onsuccess = () => {
+    const db = req.result;
+    const tx = db.transaction('audios', 'readwrite');
+    tx.objectStore('audios').put(gravado, 'teste');
+    tx.oncomplete = () => {
+      const rtx = db.transaction('audios').objectStore('audios').get('teste');
+      rtx.onsuccess = () => {
+        const b = rtx.result;
+        out.textContent = `gravou e releu: ${b.size} bytes (${b.type})\nFeche o Safari, reabra a página e toque de novo — deve reler sem regravar.`;
+        set('s-db', 'ok', '✅ OK');
+      };
+    };
+    tx.onerror = () => { out.textContent = 'ERRO gravar: ' + tx.error; set('s-db', 'fail', '❌'); };
+  };
+};
+// releitura pós-reabertura, sem regravar
+(() => {
+  const req = indexedDB.open('spike_nexus', 1);
+  req.onupgradeneeded = () => req.result.createObjectStore('audios');
+  req.onsuccess = () => {
+    try {
+      const g = req.result.transaction('audios').objectStore('audios').get('teste');
+      g.onsuccess = () => { if (g.result) { $('o-db').textContent = `persistiu de sessão anterior: ${g.result.size} bytes ✅`; set('s-db', 'ok', '✅ persistiu'); } };
+    } catch (e) {}
+  };
+})();
+
+// ---- 3. Geolocation ----
+$('b-geo').onclick = () => {
+  const out = $('o-geo');
+  const t0 = Date.now();
+  out.textContent = 'aguardando GPS…';
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      out.textContent = `lat ${p.coords.latitude.toFixed(6)}  lon ${p.coords.longitude.toFixed(6)}\nprecisão ±${Math.round(p.coords.accuracy)} m  em ${((Date.now()-t0)/1000).toFixed(1)} s\nonline: ${navigator.onLine}`;
+      set('s-geo', 'ok', '✅ OK');
+    },
+    e => { out.textContent = `ERRO (${e.code}): ${e.message}\nonline: ${navigator.onLine}`; set('s-geo', 'fail', '❌ falhou'); },
+    { enableHighAccuracy: true, timeout: 30000 }
+  );
+};
+
+// ---- 4. Web Speech ----
+$('b-stt').onclick = () => {
+  const out = $('o-stt');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { out.textContent = 'SpeechRecognition não existe neste navegador.'; set('s-stt', 'fail', '❌ sem suporte'); return; }
+  const r = new SR();
+  r.lang = 'pt-BR'; r.continuous = true; r.interimResults = true;
+  let final = '';
+  r.onresult = e => {
+    let interim = '';
+    for (const res of e.results) (res.isFinal ? final += res[0].transcript + ' ' : interim += res[0].transcript);
+    out.textContent = final + '…' + interim;
+  };
+  r.onerror = e => { out.textContent += `\nERRO: ${e.error}`; set('s-stt', e.error === 'no-speech' ? 'warn' : 'fail', '⚠️ ' + e.error); };
+  r.onend = () => { if (final.trim()) set('s-stt', 'ok', '✅ OK'); out.textContent = final || out.textContent; };
+  r.start();
+  out.textContent = 'ouvindo… fale um nome e um CPF de teste';
+  setTimeout(() => r.stop(), 10000);
+};
+</script>
+</body>
+</html>

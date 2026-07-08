@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 08/07/2026 | versao: 1.0 -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coletor">
+<meta name="theme-color" content="#0e0e10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Coletor de Ocorrência — Nexus</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0e0e10; color: #eee;
+         max-width: 560px; margin: 0 auto; padding: 14px 14px calc(20px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 1.05rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  h1 small { color: #888; font-weight: 400; font-size: .75rem; }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: #8a8a92; margin: 18px 0 8px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button { font-size: .95rem; padding: 14px 10px; border-radius: 12px; border: 1px solid #2c2c31;
+           background: #1b1b1f; color: #eee; text-align: left; width: 100%; }
+  button:active { background: #2a2a30; }
+  button:disabled { opacity: .35; }
+  button.sel { border-color: #2f6fed; background: #16233f; }
+  button.primary { background: #2f6fed; border-color: #2f6fed; text-align: center; font-weight: 600; }
+  button.danger { background: #7a1d1d; border-color: #7a1d1d; text-align: center; }
+  .marco { text-align: center; font-size: .85rem; }
+  .marco.done { border-color: #1d6b32; background: #12240f; }
+  .marco b { display: block; font-size: 1rem; }
+  .slot { display: flex; justify-content: space-between; align-items: center; }
+  .slot .chk { font-size: 1.1rem; }
+  .slot.done { border-color: #1d6b32; }
+  .slot small { display: block; color: #8a8a92; font-size: .7rem; margin-top: 3px; }
+  #tela-rec { position: fixed; inset: 0; background: #0e0e10ee; display: none;
+              flex-direction: column; justify-content: center; align-items: center; gap: 18px; padding: 24px; z-index: 10; }
+  #tela-rec.on { display: flex; }
+  #rec-papel { font-size: 1.3rem; font-weight: 700; }
+  #rec-guia { color: #aab; font-size: .95rem; text-align: center; line-height: 1.5; max-width: 320px; }
+  #rec-timer { font-size: 2.4rem; font-variant-numeric: tabular-nums; color: #f66; }
+  #rec-stop { max-width: 240px; }
+  #rec-live { color: #9c9; font-size: .8rem; text-align: center; max-height: 5em; overflow: hidden; }
+  .lista-audio { font-size: .8rem; color: #9a9aa2; margin: 4px 0 0 4px; }
+  .lista-audio button { width: auto; padding: 2px 8px; font-size: .75rem; margin-left: 6px; border-radius: 6px; }
+  #hist div { padding: 8px 4px; border-bottom: 1px solid #222; font-size: .85rem; color: #bbb; }
+  .aviso { font-size: .75rem; color: #8a6d1a; margin-top: 6px; }
+  .badge { font-size: .7rem; background: #333; border-radius: 6px; padding: 1px 6px; color: #aaa; }
+  select, input { width: 100%; font-size: 1rem; padding: 12px; border-radius: 10px; border: 1px solid #2c2c31;
+                  background: #1b1b1f; color: #eee; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>🚒 Coletor de Ocorrência <small id="estado-app">pronto</small></h1>
+
+<!-- TELA 1: setup -->
+<section id="tela-setup">
+  <h2>Tipo de ocorrência</h2>
+  <div class="grid" id="tipos"></div>
+  <h2>Sua função</h2>
+  <div class="grid" id="funcoes"></div>
+  <h2>Viatura (VTR)</h2>
+  <input id="in-vtr" placeholder="ex.: AR-132" autocapitalize="characters">
+  <button class="primary" id="b-iniciar" disabled>▶️ Iniciar ocorrência</button>
+  <h2>Ocorrências concluídas neste aparelho</h2>
+  <div id="hist"></div>
+</section>
+
+<!-- TELA 2: cockpit -->
+<section id="tela-cockpit" hidden>
+  <h2>Marcos de horário — toque no momento exato</h2>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr" id="marcos"></div>
+  <h2>Coleta — toque em quem você vai ouvir e fale</h2>
+  <div id="slots"></div>
+  <h2>Fechar</h2>
+  <button class="primary" id="b-concluir">✅ Concluir ocorrência e exportar pacote</button>
+  <button class="danger" id="b-cancelar" style="margin-top:8px">✖️ Descartar ocorrência</button>
+  <p class="aviso">As fotos georreferenciadas continuam pelo app de câmera — o local canônico vem do carimbo delas.</p>
+</section>
+
+<!-- overlay de gravação -->
+<div id="tela-rec">
+  <div id="rec-papel"></div>
+  <div id="rec-guia"></div>
+  <div id="rec-timer">0:00</div>
+  <div id="rec-live"></div>
+  <button class="danger" id="rec-stop">⏹️ Parar gravação</button>
+</div>
+
+<script>
+'use strict';
+/* ================= SCHEMA (cópia embutida de campos_ocorrencia.json) ================= */
+const SCHEMA = {
+  funcoes: [
+    { id: "guarnicao_resgate", rotulo: "Guarnição de resgate (AR)" },
+    { id: "guarnicao_incendio", rotulo: "Guarnição de incêndio (ABT)" },
+    { id: "outro", rotulo: "Outra função" }
+  ],
+  papeis: {
+    solicitante:  { rotulo: "Solicitante",         campos: ["nome","cpf","contato"] },
+    vitima:       { rotulo: "Vítima / Paciente",   campos: ["nome","idade","cpf","estado_vitima","destino"], multiplo: true },
+    condutor:     { rotulo: "Condutor envolvido",  campos: ["nome","cpf","veiculo_placa","veiculo_modelo"], multiplo: true },
+    testemunha:   { rotulo: "Testemunha",          campos: ["nome","cpf"], multiplo: true },
+    proprietario: { rotulo: "Proprietário do bem", campos: ["nome","cpf"] },
+    apoio_samu:   { rotulo: "Apoio SAMU",          campos: ["usb_numero","equipe"] },
+    apoio_pm:     { rotulo: "Apoio PM",            campos: ["batalhao","vtr_pm","equipe"] },
+    apoio_outro:  { rotulo: "Apoio externo",       campos: ["orgao","equipe"], multiplo: true },
+    relato:       { rotulo: "Relato do ocorrido",  campos: ["texto_livre"] }
+  },
+  campos: {
+    nome:"Nome completo", cpf:"CPF", idade:"Idade", contato:"Telefone (se houver)",
+    estado_vitima:"Estado da vítima (consciente? lesões?)", destino:"Destino/encaminhamento",
+    veiculo_placa:"Placa do veículo", veiculo_modelo:"Modelo/cor do veículo",
+    usb_numero:"Nº da USB", equipe:"Nomes da equipe", batalhao:"Batalhão (ex.: 37º BPM)",
+    vtr_pm:"VTR da PM", orgao:"Órgão/empresa (nomear a instituição)", texto_livre:"O que aconteceu, na ordem"
+  },
+  tipos: [
+    { id:"acidente_transito_com_vitima", rotulo:"🚗 Acidente trânsito c/ vítima", natureza_sinesp:"SINISTRO DE TRÂNSITO",
+      papeis:["solicitante","vitima","condutor","testemunha","apoio_samu","apoio_pm","relato"] },
+    { id:"incendio_residencia", rotulo:"🏠 Incêndio em edificação", natureza_sinesp:"INCÊNDIO",
+      papeis:["solicitante","vitima","proprietario","testemunha","apoio_pm","apoio_outro","relato"] },
+    { id:"fogo_veiculo", rotulo:"🚙 Fogo em veículo", natureza_sinesp:"INCÊNDIO",
+      papeis:["solicitante","proprietario","testemunha","apoio_pm","relato"] },
+    { id:"fogo_poste_fiacao", rotulo:"⚡ Fogo em poste/fiação", natureza_sinesp:"INCÊNDIO",
+      papeis:["solicitante","apoio_outro","relato"] },
+    { id:"apoio_samu_clinico", rotulo:"🚑 Apoio SAMU", natureza_sinesp:"APOIO",
+      papeis:["solicitante","vitima","apoio_samu","apoio_pm","relato"] },
+    { id:"salvamento", rotulo:"🛟 Busca e salvamento", natureza_sinesp:"BUSCA E SALVAMENTO",
+      papeis:["solicitante","vitima","testemunha","apoio_samu","apoio_pm","relato"] },
+    { id:"corte_objetos", rotulo:"💍 Corte de objetos", natureza_sinesp:"CORTE DE OBJETOS",
+      papeis:["vitima","relato"] },
+    { id:"outra", rotulo:"❓ Outra", natureza_sinesp:null,
+      papeis:["solicitante","vitima","testemunha","apoio_samu","apoio_pm","apoio_outro","relato"] }
+  ],
+  marcos: { deslocamento:"Deslocamento", chegada:"Chegada", termino:"Término" }
+};
+
+/* ================= estado + IndexedDB ================= */
+const $ = id => document.getElementById(id);
+let oc = null;          // ocorrência ativa {id, tipo, funcao, vtr, iniciada_em, marcos:{}, gravacoes:[]}
+let db = null;
+
+function abrirDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('coletor_nexus', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('ocorrencias', { keyPath: 'id' });
+      d.createObjectStore('audios');       // key: `${ocId}/${arquivo}` → Blob
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const tx = (store, mode) => db.transaction(store, mode).objectStore(store);
+const put = (store, val, key) => new Promise((res, rej) => { const q = tx(store,'readwrite').put(val, key); q.onsuccess = () => res(); q.onerror = () => rej(q.error); });
+const getAll = store => new Promise((res, rej) => { const q = tx(store,'readonly').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const getOne = (store, key) => new Promise((res, rej) => { const q = tx(store,'readonly').get(key); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const del = (store, key) => new Promise((res, rej) => { const q = tx(store,'readwrite').delete(key); q.onsuccess = () => res(); q.onerror = () => rej(q.error); });
+
+const salvarOc = () => put('ocorrencias', JSON.parse(JSON.stringify(oc)));
+const agoraISO = () => new Date().toISOString();
+const hhmm = iso => new Date(iso).toTimeString().slice(0,5);
+
+function pegarGeo() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      p => res({ lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6), precisao_m: Math.round(p.coords.accuracy) }),
+      () => res(null), { enableHighAccuracy: true, timeout: 8000 });
+  });
+}
+
+/* ================= TELA 1: setup ================= */
+let selTipo = null, selFuncao = null;
+function renderSetup() {
+  $('tipos').innerHTML = SCHEMA.tipos.map(t =>
+    `<button data-t="${t.id}" class="${selTipo===t.id?'sel':''}">${t.rotulo}</button>`).join('');
+  $('funcoes').innerHTML = SCHEMA.funcoes.map(f =>
+    `<button data-f="${f.id}" class="${selFuncao===f.id?'sel':''}">${f.rotulo}</button>`).join('');
+  $('tipos').querySelectorAll('button').forEach(b => b.onclick = () => { selTipo = b.dataset.t; renderSetup(); });
+  $('funcoes').querySelectorAll('button').forEach(b => b.onclick = () => { selFuncao = b.dataset.f; renderSetup(); });
+  $('b-iniciar').disabled = !(selTipo && selFuncao);
+}
+async function renderHist() {
+  const ocs = (await getAll('ocorrencias')).filter(o => o.concluida);
+  $('hist').innerHTML = ocs.length ? ocs.map(o =>
+    `<div>${o.rotulo_tipo} — ${hhmm(o.iniciada_em)} <span class="badge">${o.gravacoes.length} áudios</span>
+     <button data-exp="${o.id}" style="width:auto;padding:4px 10px;font-size:.75rem;margin-left:8px">⬇️ re-exportar</button></div>`).join('')
+    : '<div style="color:#666">nenhuma ainda</div>';
+  $('hist').querySelectorAll('button').forEach(b => b.onclick = async () => {
+    const o = await getOne('ocorrencias', b.dataset.exp); exportarPacote(o);
+  });
+}
+
+$('b-iniciar').onclick = async () => {
+  const tipo = SCHEMA.tipos.find(t => t.id === selTipo);
+  oc = { id: 'oc_' + Date.now(), tipo: tipo.id, rotulo_tipo: tipo.rotulo.replace(/^\S+\s/, ''),
+         natureza_sinesp: tipo.natureza_sinesp, funcao: selFuncao, vtr: $('in-vtr').value.trim() || null,
+         iniciada_em: agoraISO(), marcos: {}, gravacoes: [], concluida: false };
+  await salvarOc();
+  mostrarCockpit();
+};
+
+/* ================= TELA 2: cockpit ================= */
+function mostrarCockpit() {
+  $('tela-setup').hidden = true; $('tela-cockpit').hidden = false;
+  $('estado-app').textContent = oc.rotulo_tipo;
+  renderMarcos(); renderSlots();
+}
+function renderMarcos() {
+  $('marcos').innerHTML = Object.entries(SCHEMA.marcos).map(([id, rot]) => {
+    const t = oc.marcos[id];
+    return `<button class="marco ${t?'done':''}" data-m="${id}"><b>${t?hhmm(t.t):'—'}</b>${rot}</button>`;
+  }).join('');
+  $('marcos').querySelectorAll('button').forEach(b => b.onclick = async () => {
+    const id = b.dataset.m;
+    if (oc.marcos[id] && !confirm('Já marcado às ' + hhmm(oc.marcos[id].t) + '. Sobrescrever?')) return;
+    oc.marcos[id] = { t: agoraISO(), geo: await pegarGeo() };
+    await salvarOc(); renderMarcos();
+  });
+}
+function renderSlots() {
+  const tipo = SCHEMA.tipos.find(t => t.id === oc.tipo);
+  $('slots').innerHTML = tipo.papeis.map(pid => {
+    const p = SCHEMA.papeis[pid];
+    const n = oc.gravacoes.filter(g => g.slot === pid).length;
+    const ok = n > 0;
+    return `<button class="slot ${ok?'done':''}" data-p="${pid}" style="margin-bottom:8px">
+      <span>${p.rotulo}${p.multiplo?' <span class="badge">+</span>':''}
+        <small>${p.campos.map(c => SCHEMA.campos[c]).join(' · ')}</small></span>
+      <span class="chk">${ok ? '✅'+(n>1?' ×'+n:'') : '⭕'}</span></button>`;
+  }).join('');
+  $('slots').querySelectorAll('button').forEach(b => b.onclick = () => gravar(b.dataset.p));
+}
+
+/* ================= gravação ================= */
+let mediaRec = null, chunks = [], timerInt = null, speech = null, speechTxt = '';
+async function gravar(pid) {
+  const p = SCHEMA.papeis[pid];
+  try {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('⚠️ Sem HTTPS o iPhone bloqueia o microfone.\n\nAbra o app por um endereço https:// (não como arquivo local nem por IP). Veja as instruções do Nexus.');
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = ['audio/mp4','audio/webm',''].find(m => m === '' || MediaRecorder.isTypeSupported(m));
+    mediaRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    chunks = [];
+    mediaRec.ondataavailable = e => chunks.push(e.data);
+    const t0 = Date.now();
+    mediaRec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      clearInterval(timerInt);
+      if (speech) { try { speech.stop(); } catch(e) {} }
+      $('tela-rec').classList.remove('on');
+      const blob = new Blob(chunks, { type: mediaRec.mimeType });
+      if (blob.size === 0) { alert('Gravação vazia — tente de novo.'); return; }
+      const ext = /mp4|aac/.test(mediaRec.mimeType) ? 'm4a' : 'webm';
+      const seq = String(oc.gravacoes.length + 1).padStart(2,'0');
+      const arquivo = `audios/${seq}_${pid}_${Date.now()}.${ext}`;
+      const geo = await pegarGeo();
+      oc.gravacoes.push({ arquivo, slot: pid, t: agoraISO(), duracao_s: Math.round((Date.now()-t0)/1000),
+                          geo, mime: mediaRec.mimeType,
+                          transcricao_rascunho: speechTxt.trim() || null,
+                          campos_alvo: p.campos });
+      await put('audios', blob, oc.id + '/' + arquivo);
+      await salvarOc(); renderSlots();
+    };
+    // overlay
+    $('rec-papel').textContent = '🎙️ ' + p.rotulo;
+    $('rec-guia').textContent = 'Pergunte: ' + p.campos.map(c => SCHEMA.campos[c]).join(' → ');
+    $('rec-live').textContent = ''; speechTxt = '';
+    $('tela-rec').classList.add('on');
+    timerInt = setInterval(() => {
+      const s = Math.round((Date.now()-t0)/1000);
+      $('rec-timer').textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+    }, 250);
+    // transcrição-rascunho opcional (feature-detection; áudio é a verdade)
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      speech = new SR(); speech.lang = 'pt-BR'; speech.continuous = true; speech.interimResults = true;
+      speech.onresult = e => { let f=''; for (const r of e.results) if (r.isFinal) f += r[0].transcript + ' ';
+                               speechTxt = f; $('rec-live').textContent = f.slice(-160); };
+      speech.onerror = () => {}; try { speech.start(); } catch(e) { speech = null; }
+    } else speech = null;
+    mediaRec.start(1000); // timeslice: iOS entrega dados a cada 1s (sem isso a gravação pode vir vazia)
+  } catch (e) { alert('Não consegui acessar o microfone: ' + e.message); }
+}
+$('rec-stop').onclick = () => mediaRec && mediaRec.state !== 'inactive' && mediaRec.stop();
+
+/* ================= ZIP (store, sem compressão) ================= */
+const CRC_TAB = (() => { const t = new Uint32Array(256);
+  for (let n=0;n<256;n++){ let c=n; for (let k=0;k<8;k++) c = c&1 ? 0xEDB88320 ^ (c>>>1) : c>>>1; t[n]=c; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i=0;i<u8.length;i++) c = CRC_TAB[(c ^ u8[i]) & 0xFF] ^ (c>>>8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipar(entradas) { // [{nome, dados:Uint8Array}]
+  const enc = new TextEncoder(); const locais = []; const centrais = []; let off = 0;
+  const u16 = v => [v&255, (v>>8)&255]; const u32 = v => [v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  for (const e of entradas) {
+    const nome = enc.encode(e.nome), crc = crc32(e.dados), n = e.dados.length;
+    const loc = new Uint8Array([0x50,0x4b,3,4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0),
+                                ...u32(crc), ...u32(n), ...u32(n), ...u16(nome.length), ...u16(0)]);
+    locais.push(loc, nome, e.dados);
+    centrais.push(new Uint8Array([0x50,0x4b,1,2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0),
+                                  ...u32(crc), ...u32(n), ...u32(n), ...u16(nome.length), ...u16(0), ...u16(0),
+                                  ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nome);
+    off += loc.length + nome.length + n;
+  }
+  const cdLen = centrais.reduce((s,a)=>s+a.length,0);
+  const fim = new Uint8Array([0x50,0x4b,5,6, ...u16(0), ...u16(0), ...u16(entradas.length), ...u16(entradas.length),
+                              ...u32(cdLen), ...u32(off), ...u16(0)]);
+  return new Blob([...locais, ...centrais, fim], { type: 'application/zip' });
+}
+
+/* ================= concluir + exportar ================= */
+async function exportarPacote(o) {
+  const manifest = {
+    app_versao: '1.0',
+    ocorrencia: { tipo_sugerido: o.tipo, natureza_sinesp: o.natureza_sinesp, funcao_cadete: o.funcao,
+                  vtr: o.vtr, iniciada_em: o.iniciada_em, concluida_em: o.concluida_em || null,
+                  marcos: o.marcos },
+    gravacoes: o.gravacoes,
+    aviso_fidelidade: 'Transcricao_rascunho e feita on-device e NAO e confiavel; o audio e a fonte de verdade. Campos finais so apos estruturacao no Nexus (relatorio_ocorrencia).'
+  };
+  const entradas = [{ nome: 'manifest.json', dados: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) }];
+  for (const g of o.gravacoes) {
+    const blob = await getOne('audios', o.id + '/' + g.arquivo);
+    if (blob) entradas.push({ nome: g.arquivo, dados: new Uint8Array(await blob.arrayBuffer()) });
+  }
+  const d = new Date(o.iniciada_em);
+  const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0')
+              + '-' + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0');
+  const zip = zipar(entradas);
+  const nomeZip = `pacote_ocorrencia_${stamp}.zip`;
+  // compartilhar (iOS: folha de share → Drive/AirDrop) com fallback para download
+  const file = new File([zip], nomeZip, { type: 'application/zip' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { /* cancelado → fallback */ }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zip); a.download = nomeZip; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+
+$('b-concluir').onclick = async () => {
+  const faltam = Object.keys(SCHEMA.marcos).filter(m => !oc.marcos[m]);
+  const semAudio = oc.gravacoes.length === 0;
+  let msg = '';
+  if (faltam.length) msg += 'Marcos sem horário: ' + faltam.join(', ') + '. ';
+  if (semAudio) msg += 'Nenhum áudio gravado. ';
+  if (msg && !confirm(msg + 'Concluir mesmo assim? (o que faltar vira [A CONFIRMAR] no Nexus)')) return;
+  oc.concluida = true; oc.concluida_em = agoraISO();
+  await salvarOc();
+  await exportarPacote(oc);
+  oc = null; selTipo = null; selFuncao = null;
+  $('tela-cockpit').hidden = true; $('tela-setup').hidden = false;
+  $('estado-app').textContent = 'pronto';
+  renderSetup(); renderHist();
+};
+$('b-cancelar').onclick = async () => {
+  if (!confirm('Descartar esta ocorrência e os áudios dela?')) return;
+  for (const g of oc.gravacoes) await del('audios', oc.id + '/' + g.arquivo);
+  await del('ocorrencias', oc.id);
+  oc = null; selTipo = null; selFuncao = null;
+  $('tela-cockpit').hidden = true; $('tela-setup').hidden = false;
+  $('estado-app').textContent = 'pronto';
+  renderSetup(); renderHist();
+};
+
+/* ================= boot: retoma ocorrência aberta ================= */
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+(async () => {
+  if (!window.isSecureContext) $('estado-app').textContent = '⚠️ sem HTTPS';
+  db = await abrirDB();
+  const abertas = (await getAll('ocorrencias')).filter(o => !o.concluida);
+  if (abertas.length) { oc = abertas[abertas.length-1]; mostrarCockpit(); }
+  else renderSetup();
+  renderHist();
+})();
+</script>
+</body>
+</html>
