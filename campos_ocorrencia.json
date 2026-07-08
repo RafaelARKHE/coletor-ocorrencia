@@ -8,8 +8,9 @@
   },
 
   "funcoes": [
-    { "id": "guarnicao_resgate", "rotulo": "Guarnição de resgate (AR)" },
+    { "id": "guarnicao_salvamento", "rotulo": "Guarnição de salvamento (AR)" },
     { "id": "guarnicao_incendio", "rotulo": "Guarnição de incêndio (ABT)" },
+    { "id": "guarnicao_resgate", "rotulo": "Guarnição de resgate/APH (UR)" },
     { "id": "outro", "rotulo": "Outra função" }
   ],
 

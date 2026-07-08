@@ -63,6 +63,7 @@
   <div class="grid" id="funcoes"></div>
   <h2>Viatura (VTR)</h2>
   <input id="in-vtr" placeholder="ex.: AR-132" autocapitalize="characters">
+  <p style="color:#9a9aa2;font-size:.8rem;margin:4px 0 0 4px">AR = Salvamento · ABT = Incêndio · UR = Resgate/APH</p>
   <button class="primary" id="b-iniciar" disabled>▶️ Iniciar ocorrência</button>
   <h2>Ocorrências concluídas neste aparelho</h2>
   <div id="hist"></div>
@@ -94,8 +95,9 @@
 /* ================= SCHEMA (cópia embutida de campos_ocorrencia.json) ================= */
 const SCHEMA = {
   funcoes: [
-    { id: "guarnicao_resgate", rotulo: "Guarnição de resgate (AR)" },
+    { id: "guarnicao_salvamento", rotulo: "Guarnição de salvamento (AR)" },
     { id: "guarnicao_incendio", rotulo: "Guarnição de incêndio (ABT)" },
+    { id: "guarnicao_resgate", rotulo: "Guarnição de resgate/APH (UR)" },
     { id: "outro", rotulo: "Outra função" }
   ],
   papeis: {
