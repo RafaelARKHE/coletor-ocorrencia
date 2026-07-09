@@ -1,6 +1,6 @@
 /* Service worker do Coletor de Ocorrência — cache-first para uso OFFLINE em plantão.
    Bump CACHE quando qualquer arquivo do shell mudar. */
-const CACHE = 'coletor-v3';
+const CACHE = 'coletor-v4';
 const SHELL = [
   './',
   './coletor.html',

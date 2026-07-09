@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 08/07/2026 | versao: 1.0 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 08/07/2026 | versao: 1.1 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -43,29 +43,48 @@
   button.sel { border-color: var(--dominio); background: var(--panel2); color: var(--dominio); }
   button.primary { background: var(--dominio); border-color: var(--dominio); color: var(--bg); text-align: center; font-weight: 700; }
   button.danger { background: var(--vermelho); border-color: var(--vermelho); color: var(--text); text-align: center; }
-  .marco { text-align: center; font-size: .85rem; font-family: var(--font-dado); }
-  .marco.done { border-color: var(--verde); background: rgba(91,157,110,.14); color: var(--verde); }
-  .marco b { display: block; font-size: 1rem; font-family: var(--font-dado); }
-  .slot { display: flex; justify-content: space-between; align-items: center; }
-  .slot .chk { font-size: 1.1rem; }
-  .slot.done { border-color: var(--verde); }
-  .slot small { display: block; color: var(--sub); font-size: .7rem; margin-top: 3px; }
+
+  /* ---------- marcos de horário (com exclusão) ---------- */
+  .marco { position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+  .marco.done { border-color: var(--verde); background: rgba(91,157,110,.14); }
+  .marco-tap { text-align: center; font-size: .78rem; font-family: var(--font-dado); padding: 14px 6px; cursor: pointer; overflow-wrap: break-word; }
+  .marco.done .marco-tap { color: var(--verde); }
+  .marco-tap b { display: block; font-size: 1rem; font-family: var(--font-dado); }
+  .marco-del { position: absolute; top: 3px; right: 3px; width: auto; padding: 2px 6px; font-size: .65rem;
+               border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); color: var(--sub); }
+
+  /* ---------- slots (cartão expansível, multi-registro) ---------- */
+  .slotcard { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); margin-bottom: 8px; overflow: hidden; }
+  .slotcard.done { border-color: var(--verde); }
+  .slot-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; cursor: pointer; }
+  .slot-head small { display: block; color: var(--sub); font-size: .7rem; margin-top: 3px; }
+  .slot-head .chk { font-size: .95rem; color: var(--sub); white-space: nowrap; flex: 0 0 auto; }
+  .reg-list { padding: 0 10px; }
+  .reg-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid var(--line); font-size: .82rem; color: var(--sub); }
+  .reg-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reg-row button { width: auto; flex: 0 0 auto; padding: 3px 7px; font-size: .72rem; margin-left: 4px; border-radius: 7px; }
+  .reg-vazio { color: var(--muted); font-size: .8rem; padding: 8px 4px; }
+  .addrow { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 10px 12px; }
+  .addrow button { width: auto; flex: 0 0 auto; padding: 8px 12px; font-size: 1.05rem; border-radius: 10px; text-align: center; }
+
   #tela-rec { position: fixed; inset: 0; background: rgba(13,17,18,.94); display: none;
-              flex-direction: column; justify-content: center; align-items: center; gap: 18px; padding: 24px; z-index: 10; }
+              flex-direction: column; justify-content: center; align-items: center; gap: 14px; padding: 24px; z-index: 10; }
   #tela-rec.on { display: flex; }
   #rec-papel { font-family: var(--font-interface); font-size: 1.3rem; font-weight: 800; }
   #rec-guia { font-family: var(--font-leitura); color: var(--sub); font-size: 1rem; text-align: center; line-height: 1.5; max-width: 320px; }
   #rec-timer { font-family: var(--font-dado); font-size: 2.4rem; font-variant-numeric: tabular-nums; color: var(--vermelho); }
   #rec-stop { max-width: 240px; }
-  #rec-live { font-family: var(--font-leitura); color: var(--verde); font-size: .85rem; text-align: center; max-height: 5em; overflow: hidden; }
+  #rec-live { font-family: var(--font-leitura); color: var(--verde); font-size: .85rem; text-align: center; max-height: 4em; overflow: hidden; }
+  #rec-nota { width: 100%; max-width: 320px; min-height: 64px; font-family: var(--font-interface); font-size: .92rem; padding: 10px;
+              border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); resize: vertical; }
+  #rec-nota::placeholder { color: var(--muted); }
+
   .lista-audio { font-family: var(--font-dado); font-size: .78rem; color: var(--sub); margin: 4px 0 0 4px; }
-  .lista-audio button { width: auto; padding: 2px 8px; font-size: .75rem; margin-left: 6px; border-radius: 6px; }
   #hist div { padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: .85rem; color: var(--sub); }
-  .aviso { font-size: .78rem; color: var(--amarelo); margin-top: 6px; }
   .badge { font-family: var(--font-dado); font-size: .68rem; background: var(--panel2); border-radius: 6px; padding: 1px 6px; color: var(--sub); }
-  select, input { width: 100%; font-family: var(--font-dado); font-size: 1rem; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+  select, input, textarea { width: 100%; font-family: var(--font-dado); font-size: 1rem; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
                   background: var(--panel2); color: var(--text); margin-bottom: 8px; }
-  select:focus, input:focus { outline: none; border-color: var(--dominio); }
+  select:focus, input:focus, textarea:focus { outline: none; border-color: var(--dominio); }
 </style>
 </head>
 <body>
@@ -79,7 +98,6 @@
   <div class="grid" id="funcoes"></div>
   <h2>Viatura (VTR)</h2>
   <input id="in-vtr" placeholder="ex.: AR-132" autocapitalize="characters">
-  <p style="color:var(--sub);font-family:var(--font-dado);font-size:.75rem;margin:4px 0 0 4px">AR = Salvamento · ABT = Incêndio · UR = Resgate/APH</p>
   <button class="primary" id="b-iniciar" disabled>▶️ Iniciar ocorrência</button>
   <h2>Ocorrências concluídas neste aparelho</h2>
   <div id="hist"></div>
@@ -89,12 +107,11 @@
 <section id="tela-cockpit" hidden>
   <h2>Marcos de horário — toque no momento exato</h2>
   <div class="grid" style="grid-template-columns:1fr 1fr 1fr" id="marcos"></div>
-  <h2>Coleta — toque em quem você vai ouvir e fale</h2>
+  <h2>Coleta — toque no papel, escolha como registrar</h2>
   <div id="slots"></div>
   <h2>Fechar</h2>
   <button class="primary" id="b-concluir">✅ Concluir ocorrência e exportar pacote</button>
   <button class="danger" id="b-cancelar" style="margin-top:8px">✖️ Descartar ocorrência</button>
-  <p class="aviso">As fotos georreferenciadas continuam pelo app de câmera — o local canônico vem do carimbo delas.</p>
 </section>
 
 <!-- overlay de gravação -->
@@ -103,6 +120,7 @@
   <div id="rec-guia"></div>
   <div id="rec-timer">0:00</div>
   <div id="rec-live"></div>
+  <textarea id="rec-nota" placeholder="(opcional) digite aqui enquanto fala — redundância para maior fidelidade"></textarea>
   <button class="danger" id="rec-stop">⏹️ Parar gravação</button>
 </div>
 
@@ -157,16 +175,18 @@ const SCHEMA = {
 
 /* ================= estado + IndexedDB ================= */
 const $ = id => document.getElementById(id);
-let oc = null;          // ocorrência ativa {id, tipo, funcao, vtr, iniciada_em, marcos:{}, gravacoes:[]}
+let oc = null;          // ocorrência ativa {id, tipo, funcao, vtr, iniciada_em, marcos:{}, registros:[], concluida}
 let db = null;
+let expandidos = new Set(); // slots expandidos nesta sessão (não persistido)
 
 function abrirDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open('coletor_nexus', 1);
+    const r = indexedDB.open('coletor_nexus', 2);
     r.onupgradeneeded = () => {
       const d = r.result;
-      d.createObjectStore('ocorrencias', { keyPath: 'id' });
-      d.createObjectStore('audios');       // key: `${ocId}/${arquivo}` → Blob
+      if (!d.objectStoreNames.contains('ocorrencias')) d.createObjectStore('ocorrencias', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('audios')) d.createObjectStore('audios');   // legado v1, mantido sem uso
+      if (!d.objectStoreNames.contains('midia')) d.createObjectStore('midia');     // key: `${ocId}/${arquivo}` → Blob/File
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -181,6 +201,7 @@ const del = (store, key) => new Promise((res, rej) => { const q = tx(store,'read
 const salvarOc = () => put('ocorrencias', JSON.parse(JSON.stringify(oc)));
 const agoraISO = () => new Date().toISOString();
 const hhmm = iso => new Date(iso).toTimeString().slice(0,5);
+const novoId = () => 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
 
 function pegarGeo() {
   return new Promise(res => {
@@ -205,9 +226,9 @@ function renderSetup() {
 async function renderHist() {
   const ocs = (await getAll('ocorrencias')).filter(o => o.concluida);
   $('hist').innerHTML = ocs.length ? ocs.map(o =>
-    `<div>${o.rotulo_tipo} — ${hhmm(o.iniciada_em)} <span class="badge">${o.gravacoes.length} áudios</span>
+    `<div>${o.rotulo_tipo} — ${hhmm(o.iniciada_em)} <span class="badge">${o.registros.length} registros</span>
      <button data-exp="${o.id}" style="width:auto;padding:4px 10px;font-size:.75rem;margin-left:8px">⬇️ re-exportar</button></div>`).join('')
-    : '<div style="color:#666">nenhuma ainda</div>';
+    : '<div style="color:var(--muted)">nenhuma ainda</div>';
   $('hist').querySelectorAll('button').forEach(b => b.onclick = async () => {
     const o = await getOne('ocorrencias', b.dataset.exp); exportarPacote(o);
   });
@@ -217,7 +238,8 @@ $('b-iniciar').onclick = async () => {
   const tipo = SCHEMA.tipos.find(t => t.id === selTipo);
   oc = { id: 'oc_' + Date.now(), tipo: tipo.id, rotulo_tipo: tipo.rotulo.replace(/^\S+\s/, ''),
          natureza_sinesp: tipo.natureza_sinesp, funcao: selFuncao, vtr: $('in-vtr').value.trim() || null,
-         iniciada_em: agoraISO(), marcos: {}, gravacoes: [], concluida: false };
+         iniciada_em: agoraISO(), marcos: {}, registros: [], concluida: false };
+  expandidos = new Set();
   await salvarOc();
   mostrarCockpit();
 };
@@ -228,33 +250,148 @@ function mostrarCockpit() {
   $('estado-app').textContent = oc.rotulo_tipo;
   renderMarcos(); renderSlots();
 }
+
 function renderMarcos() {
   $('marcos').innerHTML = Object.entries(SCHEMA.marcos).map(([id, rot]) => {
     const t = oc.marcos[id];
-    return `<button class="marco ${t?'done':''}" data-m="${id}"><b>${t?hhmm(t.t):'—'}</b>${rot}</button>`;
+    return `<div class="marco ${t?'done':''}">
+      <div class="marco-tap" data-m="${id}"><b>${t?hhmm(t.t):'—'}</b>${rot}</div>
+      ${t ? `<button class="marco-del" data-m="${id}" title="Limpar marco">✕</button>` : ''}
+    </div>`;
   }).join('');
-  $('marcos').querySelectorAll('button').forEach(b => b.onclick = async () => {
-    const id = b.dataset.m;
+  $('marcos').querySelectorAll('.marco-tap').forEach(el => el.onclick = async () => {
+    const id = el.dataset.m;
     if (oc.marcos[id] && !confirm('Já marcado às ' + hhmm(oc.marcos[id].t) + '. Sobrescrever?')) return;
     oc.marcos[id] = { t: agoraISO(), geo: await pegarGeo() };
     await salvarOc(); renderMarcos();
   });
+  $('marcos').querySelectorAll('.marco-del').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    delete oc.marcos[b.dataset.m];
+    await salvarOc(); renderMarcos();
+  });
 }
+
+/* ================= slots (multi-registro: áudio/texto/foto/vídeo) ================= */
+function iconeTipo(t) { return { audio:'🎙️', foto:'📷', video:'🎥', texto:'⌨️' }[t] || '•'; }
+function resumoRegistro(r) {
+  if (r.tipo === 'audio') return (r.duracao_s||0) + 's' + (r.nota_digitada?' 📝':'') + (r.transcricao_rascunho?' 💬':'');
+  if (r.tipo === 'texto') return (r.texto||'').slice(0,44) + ((r.texto||'').length>44 ? '…' : '');
+  if (r.tipo === 'foto' || r.tipo === 'video') return r.legenda || (r.tipo === 'foto' ? 'foto' : 'vídeo');
+  return '';
+}
+
 function renderSlots() {
   const tipo = SCHEMA.tipos.find(t => t.id === oc.tipo);
   $('slots').innerHTML = tipo.papeis.map(pid => {
     const p = SCHEMA.papeis[pid];
-    const n = oc.gravacoes.filter(g => g.slot === pid).length;
-    const ok = n > 0;
-    return `<button class="slot ${ok?'done':''}" data-p="${pid}" style="margin-bottom:8px">
-      <span>${p.rotulo}${p.multiplo?' <span class="badge">+</span>':''}
-        <small>${p.campos.map(c => SCHEMA.campos[c]).join(' · ')}</small></span>
-      <span class="chk">${ok ? '✅'+(n>1?' ×'+n:'') : '⭕'}</span></button>`;
+    const regs = oc.registros.filter(r => r.slot === pid);
+    const ok = regs.length > 0;
+    const exp = expandidos.has(pid);
+    return `<div class="slotcard ${ok?'done':''}">
+      <div class="slot-head" data-p="${pid}">
+        <span>${p.rotulo}${p.multiplo?' <span class="badge">+</span>':''}
+          <small>${p.campos.map(c => SCHEMA.campos[c]).join(' · ')}</small></span>
+        <span class="chk">${ok ? '✅'+(regs.length>1?' ×'+regs.length:'') : '⭕'} ${exp?'▲':'▼'}</span>
+      </div>
+      ${exp ? `
+        <div class="reg-list">
+          ${regs.length ? regs.map(r => `<div class="reg-row">
+            <span>${iconeTipo(r.tipo)} ${resumoRegistro(r)}</span>
+            <span><button class="reg-edit" data-id="${r.id}">✏️</button><button class="reg-del" data-id="${r.id}">🗑️</button></span>
+          </div>`).join('') : '<div class="reg-vazio">nada ainda — use os botões abaixo</div>'}
+        </div>
+        <div class="addrow">
+          <button class="add-audio" title="Gravar áudio">🎙️</button>
+          <button class="add-texto" title="Digitar nota">⌨️</button>
+          <button class="add-foto" title="Tirar foto">📷</button>
+          <button class="add-foto-lib" title="Adicionar foto">🖼️</button>
+          <button class="add-video" title="Gravar vídeo">🎥</button>
+          <button class="add-video-lib" title="Adicionar vídeo">📹</button>
+        </div>` : ''}
+    </div>`;
   }).join('');
-  $('slots').querySelectorAll('button').forEach(b => b.onclick = () => gravar(b.dataset.p));
+
+  $('slots').querySelectorAll('.slot-head').forEach(h => h.onclick = () => {
+    const pid = h.dataset.p;
+    expandidos.has(pid) ? expandidos.delete(pid) : expandidos.add(pid);
+    renderSlots();
+  });
+  $('slots').querySelectorAll('.reg-edit').forEach(b => b.onclick = e => { e.stopPropagation(); editarRegistro(b.dataset.id); });
+  $('slots').querySelectorAll('.reg-del').forEach(b => b.onclick = e => { e.stopPropagation(); excluirRegistro(b.dataset.id); });
+  $('slots').querySelectorAll('.slotcard').forEach((card, i) => {
+    const pid = tipo.papeis[i];
+    const set = (cls, fn) => { const el = card.querySelector(cls); if (el) el.onclick = e => { e.stopPropagation(); fn(pid); }; };
+    set('.add-audio', gravar);
+    set('.add-texto', digitarNota);
+    set('.add-foto', pid => capturarMidia(pid, 'foto', true));
+    set('.add-foto-lib', pid => capturarMidia(pid, 'foto', false));
+    set('.add-video', pid => capturarMidia(pid, 'video', true));
+    set('.add-video-lib', pid => capturarMidia(pid, 'video', false));
+  });
 }
 
-/* ================= gravação ================= */
+function digitarNota(pid) {
+  const p = SCHEMA.papeis[pid];
+  const texto = prompt('Digite (' + p.campos.map(c => SCHEMA.campos[c]).join(', ') + '):');
+  if (texto === null || !texto.trim()) return;
+  oc.registros.push({ id: novoId(), slot: pid, tipo: 'texto', t: agoraISO(), texto: texto.trim(), campos_alvo: p.campos });
+  salvarOc(); renderSlots();
+}
+
+function extPara(tipo, mime) {
+  if (tipo === 'foto') return /png/.test(mime) ? 'png' : 'jpg';
+  return /quicktime/.test(mime) ? 'mov' : 'mp4';
+}
+function capturarMidia(pid, tipo, fromCamera) {
+  const p = SCHEMA.papeis[pid];
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = tipo === 'foto' ? 'image/*' : 'video/*';
+  if (fromCamera) input.capture = 'environment';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const geo = await pegarGeo();
+    const ext = extPara(tipo, file.type);
+    const seq = String(oc.registros.length + 1).padStart(2,'0');
+    const arquivo = `midia/${pid}/${seq}_${tipo}_${Date.now()}.${ext}`;
+    oc.registros.push({ id: novoId(), arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: file.type, legenda: null, campos_alvo: p.campos });
+    await put('midia', file, oc.id + '/' + arquivo);
+    await salvarOc(); renderSlots();
+  };
+  input.click();
+}
+
+function editarRegistro(id) {
+  const r = oc.registros.find(x => x.id === id);
+  if (!r) return;
+  if (r.tipo === 'texto') {
+    const novo = prompt('Editar nota:', r.texto || '');
+    if (novo === null) return;
+    r.texto = novo.trim();
+  } else if (r.tipo === 'audio') {
+    const novo = prompt('Nota digitada (redundância) para este áudio:', r.nota_digitada || '');
+    if (novo === null) return;
+    r.nota_digitada = novo.trim() || null;
+  } else {
+    const novo = prompt('Legenda (opcional):', r.legenda || '');
+    if (novo === null) return;
+    r.legenda = novo.trim() || null;
+  }
+  salvarOc(); renderSlots();
+}
+
+async function excluirRegistro(id) {
+  const r = oc.registros.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('Excluir este registro (' + r.tipo + ')?')) return;
+  if (r.arquivo) await del('midia', oc.id + '/' + r.arquivo);
+  oc.registros = oc.registros.filter(x => x.id !== id);
+  await salvarOc(); renderSlots();
+}
+
+/* ================= gravação de áudio ================= */
 let mediaRec = null, chunks = [], timerInt = null, speech = null, speechTxt = '';
 async function gravar(pid) {
   const p = SCHEMA.papeis[pid];
@@ -276,21 +413,24 @@ async function gravar(pid) {
       $('tela-rec').classList.remove('on');
       const blob = new Blob(chunks, { type: mediaRec.mimeType });
       if (blob.size === 0) { alert('Gravação vazia — tente de novo.'); return; }
+      const notaDigitada = $('rec-nota').value.trim() || null;
       const ext = /mp4|aac/.test(mediaRec.mimeType) ? 'm4a' : 'webm';
-      const seq = String(oc.gravacoes.length + 1).padStart(2,'0');
-      const arquivo = `audios/${seq}_${pid}_${Date.now()}.${ext}`;
+      const seq = String(oc.registros.length + 1).padStart(2,'0');
+      const arquivo = `midia/${pid}/${seq}_audio_${Date.now()}.${ext}`;
       const geo = await pegarGeo();
-      oc.gravacoes.push({ arquivo, slot: pid, t: agoraISO(), duracao_s: Math.round((Date.now()-t0)/1000),
+      oc.registros.push({ id: novoId(), arquivo, slot: pid, tipo: 'audio', t: agoraISO(), duracao_s: Math.round((Date.now()-t0)/1000),
                           geo, mime: mediaRec.mimeType,
                           transcricao_rascunho: speechTxt.trim() || null,
+                          nota_digitada: notaDigitada,
                           campos_alvo: p.campos });
-      await put('audios', blob, oc.id + '/' + arquivo);
+      await put('midia', blob, oc.id + '/' + arquivo);
       await salvarOc(); renderSlots();
     };
     // overlay
     $('rec-papel').textContent = '🎙️ ' + p.rotulo;
     $('rec-guia').textContent = 'Pergunte: ' + p.campos.map(c => SCHEMA.campos[c]).join(' → ');
     $('rec-live').textContent = ''; speechTxt = '';
+    $('rec-nota').value = '';
     $('tela-rec').classList.add('on');
     timerInt = setInterval(() => {
       const s = Math.round((Date.now()-t0)/1000);
@@ -335,17 +475,18 @@ function zipar(entradas) { // [{nome, dados:Uint8Array}]
 /* ================= concluir + exportar ================= */
 async function exportarPacote(o) {
   const manifest = {
-    app_versao: '1.0',
+    app_versao: '1.1',
     ocorrencia: { tipo_sugerido: o.tipo, natureza_sinesp: o.natureza_sinesp, funcao_cadete: o.funcao,
                   vtr: o.vtr, iniciada_em: o.iniciada_em, concluida_em: o.concluida_em || null,
                   marcos: o.marcos },
-    gravacoes: o.gravacoes,
-    aviso_fidelidade: 'Transcricao_rascunho e feita on-device e NAO e confiavel; o audio e a fonte de verdade. Campos finais so apos estruturacao no Nexus (relatorio_ocorrencia).'
+    registros: o.registros,
+    aviso_fidelidade: 'transcricao_rascunho e nota_digitada sao auxiliares (on-device / digitados pelo cadete); o audio/midia original e a fonte de verdade em caso de divergencia. Campos finais so apos estruturacao no Nexus (relatorio_ocorrencia).'
   };
   const entradas = [{ nome: 'manifest.json', dados: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) }];
-  for (const g of o.gravacoes) {
-    const blob = await getOne('audios', o.id + '/' + g.arquivo);
-    if (blob) entradas.push({ nome: g.arquivo, dados: new Uint8Array(await blob.arrayBuffer()) });
+  for (const r of o.registros) {
+    if (!r.arquivo) continue; // registros de texto não têm arquivo de mídia
+    const blob = await getOne('midia', o.id + '/' + r.arquivo);
+    if (blob) entradas.push({ nome: r.arquivo, dados: new Uint8Array(await blob.arrayBuffer()) });
   }
   const d = new Date(o.iniciada_em);
   const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0')
@@ -364,10 +505,10 @@ async function exportarPacote(o) {
 
 $('b-concluir').onclick = async () => {
   const faltam = Object.keys(SCHEMA.marcos).filter(m => !oc.marcos[m]);
-  const semAudio = oc.gravacoes.length === 0;
+  const semRegistro = oc.registros.length === 0;
   let msg = '';
   if (faltam.length) msg += 'Marcos sem horário: ' + faltam.join(', ') + '. ';
-  if (semAudio) msg += 'Nenhum áudio gravado. ';
+  if (semRegistro) msg += 'Nenhum registro (áudio/texto/foto/vídeo) feito. ';
   if (msg && !confirm(msg + 'Concluir mesmo assim? (o que faltar vira [A CONFIRMAR] no Nexus)')) return;
   oc.concluida = true; oc.concluida_em = agoraISO();
   await salvarOc();
@@ -378,8 +519,8 @@ $('b-concluir').onclick = async () => {
   renderSetup(); renderHist();
 };
 $('b-cancelar').onclick = async () => {
-  if (!confirm('Descartar esta ocorrência e os áudios dela?')) return;
-  for (const g of oc.gravacoes) await del('audios', oc.id + '/' + g.arquivo);
+  if (!confirm('Descartar esta ocorrência e os registros dela?')) return;
+  for (const r of oc.registros) if (r.arquivo) await del('midia', oc.id + '/' + r.arquivo);
   await del('ocorrencias', oc.id);
   oc = null; selTipo = null; selFuncao = null;
   $('tela-cockpit').hidden = true; $('tela-setup').hidden = false;

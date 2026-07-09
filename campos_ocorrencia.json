@@ -1,8 +1,8 @@
 {
   "_meta": {
     "sistema": "Nexus",
-    "descricao": "Schema adaptativo do Coletor de Ocorrência: superset de papéis/campos exigidos pelo minuto a minuto (e alinhado ao SINESP), com o mapa tipo→o que acende. O coletor.html embute uma cópia deste schema; este arquivo é a referência canônica lida pelo Nexus na ingestão.",
-    "versao": "1.0",
+    "descricao": "Schema adaptativo do Coletor de Ocorrência: superset de papéis/campos exigidos pelo minuto a minuto (e alinhado ao SINESP), com o mapa tipo→o que acende. Cada papel aceita captura multimodal (áudio, texto digitado, foto, vídeo) — não só áudio. O coletor.html embute uma cópia deste schema; este arquivo é a referência canônica lida pelo Nexus na ingestão.",
+    "versao": "1.1",
     "criado_em": "08/07/2026",
     "fonte_naturezas": "Nexus_Obsidian/Operacional/naturezas_sinesp.md"
   },
