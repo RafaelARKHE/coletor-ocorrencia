@@ -203,6 +203,24 @@ const agoraISO = () => new Date().toISOString();
 const hhmm = iso => new Date(iso).toTimeString().slice(0,5);
 const novoId = () => 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
 
+// Migração defensiva: ocorrências abertas/salvas ANTES da v1.1 (schema 'gravacoes',
+// sem 'registros') não podem travar o app ao serem retomadas ou re-exportadas.
+function normalizarOc(o) {
+  if (!o) return o;
+  if (!Array.isArray(o.registros)) {
+    o.registros = (Array.isArray(o.gravacoes) ? o.gravacoes : []).map(g => ({
+      id: g.id || novoId(), tipo: g.tipo || 'audio', ...g
+    }));
+  }
+  if (!o.marcos) o.marcos = {};
+  return o;
+}
+// Blob de mídia: tenta a store nova ('midia'); cai para a store legada ('audios')
+// se o registro for de antes da v1.1 (blob ainda mora lá com o caminho antigo).
+async function obterBlobMidia(ocId, arquivo) {
+  return (await getOne('midia', ocId + '/' + arquivo)) || (await getOne('audios', ocId + '/' + arquivo));
+}
+
 function pegarGeo() {
   return new Promise(res => {
     if (!navigator.geolocation) return res(null);
@@ -224,13 +242,13 @@ function renderSetup() {
   $('b-iniciar').disabled = !(selTipo && selFuncao);
 }
 async function renderHist() {
-  const ocs = (await getAll('ocorrencias')).filter(o => o.concluida);
+  const ocs = (await getAll('ocorrencias')).filter(o => o.concluida).map(normalizarOc);
   $('hist').innerHTML = ocs.length ? ocs.map(o =>
     `<div>${o.rotulo_tipo} — ${hhmm(o.iniciada_em)} <span class="badge">${o.registros.length} registros</span>
      <button data-exp="${o.id}" style="width:auto;padding:4px 10px;font-size:.75rem;margin-left:8px">⬇️ re-exportar</button></div>`).join('')
     : '<div style="color:var(--muted)">nenhuma ainda</div>';
   $('hist').querySelectorAll('button').forEach(b => b.onclick = async () => {
-    const o = await getOne('ocorrencias', b.dataset.exp); exportarPacote(o);
+    const o = normalizarOc(await getOne('ocorrencias', b.dataset.exp)); exportarPacote(o);
   });
 }
 
@@ -485,7 +503,7 @@ async function exportarPacote(o) {
   const entradas = [{ nome: 'manifest.json', dados: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) }];
   for (const r of o.registros) {
     if (!r.arquivo) continue; // registros de texto não têm arquivo de mídia
-    const blob = await getOne('midia', o.id + '/' + r.arquivo);
+    const blob = await obterBlobMidia(o.id, r.arquivo);
     if (blob) entradas.push({ nome: r.arquivo, dados: new Uint8Array(await blob.arrayBuffer()) });
   }
   const d = new Date(o.iniciada_em);
@@ -520,7 +538,7 @@ $('b-concluir').onclick = async () => {
 };
 $('b-cancelar').onclick = async () => {
   if (!confirm('Descartar esta ocorrência e os registros dela?')) return;
-  for (const r of oc.registros) if (r.arquivo) await del('midia', oc.id + '/' + r.arquivo);
+  for (const r of oc.registros) if (r.arquivo) { await del('midia', oc.id + '/' + r.arquivo); await del('audios', oc.id + '/' + r.arquivo); }
   await del('ocorrencias', oc.id);
   oc = null; selTipo = null; selFuncao = null;
   $('tela-cockpit').hidden = true; $('tela-setup').hidden = false;
@@ -536,7 +554,7 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
   if (!window.isSecureContext) $('estado-app').textContent = '⚠️ sem HTTPS';
   db = await abrirDB();
   const abertas = (await getAll('ocorrencias')).filter(o => !o.concluida);
-  if (abertas.length) { oc = abertas[abertas.length-1]; mostrarCockpit(); }
+  if (abertas.length) { oc = normalizarOc(abertas[abertas.length-1]); await salvarOc(); mostrarCockpit(); }
   else renderSetup();
   renderHist();
 })();
