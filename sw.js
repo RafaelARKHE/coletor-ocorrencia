@@ -1,9 +1,9 @@
-/* Service worker do Coletor de Ocorrência — cache-first para uso OFFLINE em plantão.
+/* Service worker do Registro de Ocorrência — cache-first para uso OFFLINE em plantão.
    Bump CACHE quando qualquer arquivo do shell mudar. */
-const CACHE = 'coletor-v6';
+const CACHE = 'registro-v2';
 const SHELL = [
   './',
-  './coletor.html',
+  './registro.html',
   './campos_ocorrencia.json',
   './manifest.webmanifest',
   './icon-192.png',
@@ -30,6 +30,6 @@ self.addEventListener('fetch', e => {
         const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy));
       }
       return res;
-    }).catch(() => caches.match('./coletor.html')))
+    }).catch(() => caches.match('./registro.html')))
   );
 });

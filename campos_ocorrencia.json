@@ -2,9 +2,9 @@
   "_meta": {
     "sistema": "Nexus",
     "descricao": "Schema adaptativo do Coletor de Ocorrência: superset de papéis/campos exigidos pelo minuto a minuto (e alinhado ao SINESP), com o mapa tipo→o que acende. Cada papel aceita captura multimodal (áudio, texto digitado, foto, vídeo) — não só áudio. O coletor.html embute uma cópia deste schema; este arquivo é a referência canônica lida pelo Nexus na ingestão.",
-    "versao": "1.2",
+    "versao": "1.3",
     "criado_em": "08/07/2026",
-    "atualizado_em": "09/07/2026",
+    "atualizado_em": "12/07/2026",
     "fonte_naturezas": "Nexus_Obsidian/Operacional/naturezas_sinesp.md"
   },
 
@@ -12,6 +12,7 @@
     { "id": "guarnicao_salvamento", "rotulo": "Guarnição de salvamento (AR)" },
     { "id": "guarnicao_incendio", "rotulo": "Guarnição de incêndio (ABT)" },
     { "id": "guarnicao_resgate", "rotulo": "Guarnição de resgate/APH (UR)" },
+    { "id": "preservacao_evento", "rotulo": "Preservação de evento (estádio/show)" },
     { "id": "outro", "rotulo": "Outra função" }
   ],
 
@@ -86,6 +87,30 @@
       "rotulo": "Corte de objetos (anel preso etc.)",
       "natureza_sinesp": "CORTE DE OBJETOS",
       "papeis": ["vitima", "relato"]
+    },
+    {
+      "id": "emergencia_medica_evento",
+      "rotulo": "Emergência médica em evento (mal súbito)",
+      "natureza_sinesp": "EMERGÊNCIA MÉDICA",
+      "papeis": ["vitima", "testemunha", "apoio_samu", "apoio_pm", "relato"]
+    },
+    {
+      "id": "principio_incendio_evento",
+      "rotulo": "Princípio de incêndio em evento",
+      "natureza_sinesp": "INCÊNDIO",
+      "papeis": ["solicitante", "proprietario", "apoio_pm", "relato"]
+    },
+    {
+      "id": "pessoa_perdida_evento",
+      "rotulo": "Pessoa/criança perdida em evento",
+      "natureza_sinesp": "LOCALIZAÇÃO DE PESSOA DESAPARECIDA",
+      "papeis": ["solicitante", "vitima", "apoio_pm", "relato"]
+    },
+    {
+      "id": "atividade_preventiva",
+      "rotulo": "Atividade preventiva (vistoria/posto, sem vítima)",
+      "natureza_sinesp": "ATIVIDADE PREVENTIVA",
+      "papeis": ["relato"]
     },
     {
       "id": "outra",
