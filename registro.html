@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 12/07/2026 | versao: 2.1 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.2 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -425,9 +425,229 @@ function pegarGeo() {
   return new Promise(res => {
     if (!navigator.geolocation) return res(null);
     navigator.geolocation.getCurrentPosition(
-      p => res({ lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6), precisao_m: Math.round(p.coords.accuracy) }),
+      p => res({
+        lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6),
+        precisao_m: Math.round(p.coords.accuracy),
+        altitude_m: (typeof p.coords.altitude === 'number' && !Number.isNaN(p.coords.altitude)) ? Math.round(p.coords.altitude) : null,
+        velocidade_kmh: (typeof p.coords.speed === 'number' && p.coords.speed >= 0) ? Math.round(p.coords.speed * 3.6) : null,
+        // heading do GPS só vem preenchido em movimento; parado, cai pro compasso do aparelho (best-effort)
+        heading_graus: (typeof p.coords.heading === 'number' && !Number.isNaN(p.coords.heading)) ? Math.round(p.coords.heading)
+                       : (headingAtual != null ? Math.round(headingAtual) : null)
+      }),
       () => res(null), { enableHighAccuracy: true, timeout: 8000 });
   });
+}
+
+/* ================= bússola do carimbo (orientação do aparelho, best-effort) =================
+   iOS exige DeviceOrientationEvent.requestPermission() disparado por gesto do usuário — por isso
+   é pedida no toque do botão "Tirar foto", nunca no carregamento da página. Android não pede
+   permissão à parte (geolocation cobre). Sem sinal de nenhum dos dois, o carimbo omite a seta e
+   mostra só a rosa dos ventos — nunca inventa direção. */
+let headingAtual = null;
+function onOrientacaoDispositivo(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading; // iOS: já 0°=N, sentido horário
+  else if (typeof e.alpha === 'number') h = (360 - e.alpha) % 360; // Android/outros: alpha cresce anti-horário
+  if (h != null && !Number.isNaN(h)) headingAtual = h;
+}
+if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+  window.addEventListener('deviceorientation', onOrientacaoDispositivo, true);
+}
+let bussolaPedida = false;
+function pedirBussola() {
+  if (bussolaPedida) return;
+  bussolaPedida = true;
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(r => {
+        if (r === 'granted') window.addEventListener('deviceorientation', onOrientacaoDispositivo, true);
+      }).catch(() => {});
+    }
+  } catch (e) { /* sem bússola — carimbo segue sem a seta */ }
+}
+
+/* ================= carimbo visual da foto (data/hora, coordenadas, endereço, bússola, mini-mapa) =================
+   Espelha o padrão do app de câmera georreferenciada dedicado (ver Nexus_Materiais/.../oc01_chegada_idx331.jpeg):
+   bússola + brasões + mini-mapa + bloco de texto. Desenhado por proporção do canvas (%), não px fixo,
+   pra caber igual em qualquer resolução/aparelho. Endereço e mini-mapa são best-effort (só com rede);
+   coordenadas e data/hora nunca dependem de rede. Só aplicado a fotos tiradas AGORA pela câmera do
+   Coletor — nunca em foto importada da galeria (não dá pra carimbar local/hora de algo que não foi
+   capturado neste instante, seria fabricar dado). */
+let imgBrasao = null;
+function carregarImagem(url, timeoutMs) {
+  return new Promise(res => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    let feito = false;
+    const t = setTimeout(() => { if (!feito) { feito = true; res(null); } }, timeoutMs);
+    img.onload = () => { if (!feito) { feito = true; clearTimeout(t); res(img); } };
+    img.onerror = () => { if (!feito) { feito = true; clearTimeout(t); res(null); } };
+    img.src = url;
+  });
+}
+carregarImagem('brasao-cbmpa.png', 6000).then(img => { imgBrasao = img; });
+
+async function carregarBitmapFoto(file) {
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(file); } catch (e) {}
+  }
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function paraDMS(valor, ehLatitude) {
+  const abs = Math.abs(valor);
+  const g = Math.floor(abs);
+  const mFloat = (abs - g) * 60;
+  const m = Math.floor(mFloat);
+  const s = ((mFloat - m) * 60).toFixed(3).replace('.', ',');
+  const letra = ehLatitude ? (valor >= 0 ? 'N' : 'S') : (valor >= 0 ? 'L' : 'W');
+  return `${g}°${m}'${s}"${letra}`;
+}
+function grausParaCardeal(g) {
+  return ['N','NE','L','SE','S','SO','W','NO'][Math.round(((g % 360) + 360) % 360 / 45) % 8];
+}
+function lonLatParaTile(lon, lat, zoom) {
+  const n = Math.pow(2, zoom);
+  const x = (lon + 180) / 360 * n;
+  const latRad = lat * Math.PI / 180;
+  const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+  return { x, y };
+}
+async function buscarEnderecoReverso(lat, lon) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, { signal: ctrl.signal, headers: { 'Accept-Language': 'pt-BR' } });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const a = j.address || {};
+    const rua = a.road || a.pedestrian || a.footway || a.residential || '';
+    const numero = a.house_number ? a.house_number + ' ' : '';
+    const bairro = a.suburb || a.neighbourhood || a.quarter || '';
+    const cidade = a.city || a.town || a.municipality || '';
+    const estado = a.state || '';
+    const linhas = [];
+    if (rua) linhas.push((numero + rua).trim());
+    if (bairro) linhas.push(bairro);
+    if (cidade) linhas.push(cidade);
+    if (estado) linhas.push(estado);
+    return linhas.length ? linhas : null;
+  } catch (e) { return null; }
+}
+
+async function carimbarFoto(file, geo) {
+  const bitmap = await carregarBitmapFoto(file);
+  if (!bitmap) return null; // não deu pra decodificar — quem chamou mantém o arquivo original
+  const W = bitmap.width, H = bitmap.height;
+  if (!W || !H) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, W, H);
+
+  const pad = W * 0.035;
+  const agora = new Date();
+  const dataFmt = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '');
+  const dataHora = `${dataFmt} ${agora.toTimeString().slice(0, 8)}`;
+
+  // endereço + tile do mini-mapa: best-effort, só com geo válida e rede — nunca trava o carimbo
+  let linhasEndereco = null, tile = null, pinFrac = null;
+  if (geo && navigator.onLine) {
+    const zoom = 17;
+    const { x, y } = lonLatParaTile(geo.lon, geo.lat, zoom);
+    const tx = Math.floor(x), ty = Math.floor(y);
+    pinFrac = { x: (x - tx) * 256, y: (y - ty) * 256 };
+    [linhasEndereco, tile] = await Promise.all([
+      buscarEnderecoReverso(geo.lat, geo.lon),
+      carregarImagem(`https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`, 5000)
+    ]);
+  }
+
+  /* ---- bússola (canto sup. esq.) ---- */
+  const dBuss = W * 0.15, cx = pad + dBuss / 2, cy = pad + dBuss / 2, r = dBuss / 2;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,17,18,.55)'; ctx.fill();
+  ctx.lineWidth = W * 0.003; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(dBuss * 0.16)}px sans-serif`;
+  ctx.fillText('N', cx, cy - r * 0.72);
+  ctx.fillText('S', cx, cy + r * 0.72);
+  ctx.font = `700 ${Math.round(dBuss * 0.13)}px sans-serif`;
+  ctx.fillText('L', cx + r * 0.72, cy);
+  ctx.fillText('W', cx - r * 0.72, cy);
+  if (geo && typeof geo.heading_graus === 'number') {
+    const ang = geo.heading_graus * Math.PI / 180;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0, -r * 0.62); ctx.lineTo(r * 0.16, r * 0.3); ctx.lineTo(0, r * 0.14); ctx.lineTo(-r * 0.16, r * 0.3); ctx.closePath();
+    ctx.fillStyle = '#e0692e'; ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  /* ---- brasões (canto sup. dir.) ---- */
+  if (imgBrasao) {
+    const wB = W * 0.30, hB = wB * (imgBrasao.height / imgBrasao.width);
+    const xB = W - pad - wB, yB = pad, raio = wB * 0.05;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(xB + raio, yB); ctx.arcTo(xB + wB, yB, xB + wB, yB + hB, raio);
+    ctx.arcTo(xB + wB, yB + hB, xB, yB + hB, raio); ctx.arcTo(xB, yB + hB, xB, yB, raio); ctx.arcTo(xB, yB, xB + wB, yB, raio);
+    ctx.closePath();
+    ctx.fillStyle = '#fff'; ctx.fill(); ctx.clip();
+    ctx.drawImage(imgBrasao, xB, yB, wB, hB);
+    ctx.restore();
+  }
+
+  /* ---- bloco de texto (canto inf. dir.) ---- */
+  const linhas = [dataHora, geo ? `${paraDMS(geo.lat, true)} ${paraDMS(geo.lon, false)}` : '[A CONFIRMAR]'];
+  if (geo && typeof geo.heading_graus === 'number') linhas.push(`${geo.heading_graus}° ${grausParaCardeal(geo.heading_graus)}`);
+  if (linhasEndereco) linhas.push(...linhasEndereco);
+  if (geo && geo.altitude_m != null) linhas.push(`Altitude: ${geo.altitude_m}msnm`);
+  if (geo && geo.velocidade_kmh != null) linhas.push(`Velocidade: ${geo.velocidade_kmh}km/h`);
+  linhas.push('#CBMPA');
+
+  const fonte = W * 0.034;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
+  ctx.font = `700 ${Math.round(fonte)}px sans-serif`;
+  let y = H - pad;
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    ctx.lineWidth = fonte * 0.16; ctx.strokeStyle = 'rgba(0,0,0,.65)';
+    ctx.strokeText(linhas[i], W - pad, y);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(linhas[i], W - pad, y);
+    y -= fonte * 1.35;
+  }
+
+  /* ---- mini-mapa (canto inf. esq.) — só desenha se o tile carregou ---- */
+  if (tile && pinFrac) {
+    const wM = W * 0.34, hM = wM, xM = pad, yM = H - pad - hM, raio = wM * 0.06;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(xM + raio, yM); ctx.arcTo(xM + wM, yM, xM + wM, yM + hM, raio);
+    ctx.arcTo(xM + wM, yM + hM, xM, yM + hM, raio); ctx.arcTo(xM, yM + hM, xM, yM, raio); ctx.arcTo(xM, yM, xM + wM, yM, raio);
+    ctx.closePath(); ctx.clip();
+    const escala = wM / 160; // recorte de ~160px do tile — mais "zoom" visual que o tile inteiro
+    const offX = xM + wM / 2 - pinFrac.x * escala, offY = yM + hM / 2 - pinFrac.y * escala;
+    ctx.drawImage(tile, offX, offY, 256 * escala, 256 * escala);
+    ctx.restore();
+    ctx.lineWidth = W * 0.003; ctx.strokeStyle = 'rgba(255,255,255,.7)';
+    ctx.beginPath();
+    ctx.moveTo(xM + raio, yM); ctx.arcTo(xM + wM, yM, xM + wM, yM + hM, raio);
+    ctx.arcTo(xM + wM, yM + hM, xM, yM + hM, raio); ctx.arcTo(xM, yM + hM, xM, yM, raio); ctx.arcTo(xM, yM, xM + wM, yM, raio);
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(xM + wM / 2, yM + hM / 2, wM * 0.035, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0392b'; ctx.fill();
+    ctx.lineWidth = wM * 0.012; ctx.strokeStyle = '#fff'; ctx.stroke();
+  }
+
+  return new Promise(res => canvas.toBlob(b => res(b || null), 'image/jpeg', 0.88));
 }
 
 /* ================= TELA 1: setup ================= */
@@ -771,7 +991,7 @@ function aplicarSeek(wave, e) {
 
 $('slot-audio').onclick = () => slotAtual && gravar(slotAtual);
 $('slot-texto').onclick = () => slotAtual && digitarNota(slotAtual);
-$('slot-foto').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', true);
+$('slot-foto').onclick = () => { pedirBussola(); slotAtual && capturarMidia(slotAtual, 'foto', true); };
 $('slot-foto-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', false);
 $('slot-video').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', true);
 $('slot-video-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', false);
@@ -817,11 +1037,16 @@ function capturarMidia(pid, tipo, fromCamera) {
     const file = input.files && input.files[0];
     if (!file) return;
     const geo = await pegarGeo();
-    const ext = extPara(tipo, file.type);
+    let midiaFinal = file, mimeFinal = file.type, carimbada = false;
+    if (tipo === 'foto' && fromCamera) {
+      const stamped = await carimbarFoto(file, geo);
+      if (stamped) { midiaFinal = stamped; mimeFinal = 'image/jpeg'; carimbada = true; }
+    }
+    const ext = extPara(tipo, mimeFinal);
     const seq = String(oc.registros.length + 1).padStart(2,'0');
     const arquivo = `midia/${pid}/${seq}_${tipo}_${Date.now()}.${ext}`;
-    oc.registros.push({ id: novoId(), arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: file.type, legenda: null, campos_alvo: p.campos });
-    await put('midia', file, oc.id + '/' + arquivo);
+    oc.registros.push({ id: novoId(), arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: mimeFinal, legenda: null, campos_alvo: p.campos, carimbo_visual: carimbada });
+    await put('midia', midiaFinal, oc.id + '/' + arquivo);
     await salvarOc(); renderSlotSheet();
   };
   input.click();

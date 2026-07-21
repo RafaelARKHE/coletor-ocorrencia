@@ -1,13 +1,14 @@
 /* Service worker do Registro de Ocorrência — cache-first para uso OFFLINE em plantão.
    Bump CACHE quando qualquer arquivo do shell mudar. */
-const CACHE = 'registro-v3';
+const CACHE = 'registro-v4';
 const SHELL = [
   './',
   './registro.html',
   './campos_ocorrencia.json',
   './manifest.webmanifest',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './brasao-cbmpa.png'
 ];
 
 self.addEventListener('install', e => {
