@@ -1,6 +1,6 @@
 /* Service worker do Registro de Ocorrência — cache-first para uso OFFLINE em plantão.
    Bump CACHE quando qualquer arquivo do shell mudar. */
-const CACHE = 'registro-v5';
+const CACHE = 'registro-v6';
 const SHELL = [
   './',
   './registro.html',

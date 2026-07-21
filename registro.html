@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.2 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.4 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -108,11 +108,23 @@
   .sheet-head small { display: block; color: var(--sub); font-size: .78rem; margin-top: 4px; font-family: var(--font-leitura); }
   .sheet-close { width: auto; flex: 0 0 auto; padding: 6px 10px; border-radius: 10px; font-size: .85rem; }
 
-  /* ---------- fileira de miniaturas (decorativa) na pasta do slot ---------- */
+  /* ---------- fileira de miniaturas na pasta do slot (foto real quando existe) ---------- */
   .thumbs { display: flex; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
   .thumb { width: 52px; height: 52px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--verde);
-           display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex: 0 0 auto; }
+           display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex: 0 0 auto; overflow: hidden; padding: 0; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb-add { border: 1px dashed var(--line); color: var(--muted); font-size: .9rem; }
+
+  /* ---------- visualizador de foto em tela cheia (a foto JÁ carimbada, tirada pelo Coletor) ---------- */
+  #tela-foto { position: fixed; inset: 0; background: rgba(13,17,18,.97); display: none;
+               flex-direction: column; z-index: 60; }
+  #tela-foto.on { display: flex; }
+  .foto-topo { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px calc(10px + env(safe-area-inset-top)); }
+  .foto-topo button { width: auto; padding: 8px 14px; }
+  #foto-full-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0 8px; }
+  #foto-full { max-width: 100%; max-height: 100%; border-radius: 10px; }
+  #foto-legenda { text-align: center; font-family: var(--font-dado); font-size: .68rem; color: var(--sub);
+                  padding: 10px 14px calc(18px + env(safe-area-inset-bottom)); }
 
   .reg-list { margin: 12px 0; }
   .reg-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: .84rem; color: var(--sub); }
@@ -312,6 +324,16 @@
       <button id="rec-stop">⏹ Concluir</button>
     </div>
   </div>
+</div>
+
+<!-- visualizador em tela cheia da foto já carimbada -->
+<div id="tela-foto">
+  <div class="foto-topo">
+    <span></span>
+    <button id="foto-fechar">✕ Fechar</button>
+  </div>
+  <div id="foto-full-wrap"><img id="foto-full" alt="Foto carimbada"></div>
+  <div id="foto-legenda"></div>
 </div>
 
 <script>
@@ -913,7 +935,10 @@ function renderSlotSheet() {
   const regs = oc.registros.filter(r => r.slot === slotAtual);
   $('slot-titulo').textContent = p.rotulo;
   $('slot-guia').textContent = `${p.campos.map(rotuloCampo).join(' · ')} · ${regs.length} ${regs.length===1?'item':'itens'}`;
-  $('slot-thumbs').innerHTML = regs.map(r => `<div class="thumb">${iconeTipo(r.tipo)}</div>`).join('') + '<div class="thumb thumb-add">+</div>';
+  $('slot-thumbs').innerHTML = regs.map(r => r.tipo === 'foto'
+    ? `<div class="thumb thumb-foto" data-id="${r.id}">${iconeTipo(r.tipo)}</div>`
+    : `<div class="thumb">${iconeTipo(r.tipo)}</div>`
+  ).join('') + '<div class="thumb thumb-add">+</div>';
   $('slot-regs').innerHTML = regs.length ? regs.map(r => {
     if (r.tipo === 'audio') {
       return `<div class="reg-row reg-row-audio">
@@ -924,9 +949,11 @@ function renderSlotSheet() {
         </span>
       </div>`;
     }
+    const verBtn = r.tipo === 'foto' ? `<button class="reg-ver" data-id="${r.id}">👁️</button>` : '';
     return `<div class="reg-row">
         <span>${iconeTipo(r.tipo)} ${resumoRegistro(r)}</span>
         <span class="reg-btns">
+          ${verBtn}
           <button class="reg-edit" data-id="${r.id}">✏️</button>
           <button class="reg-del" data-id="${r.id}">🗑️</button>
         </span>
@@ -938,7 +965,45 @@ function renderSlotSheet() {
   });
   $('slot-regs').querySelectorAll('.reg-edit').forEach(b => b.onclick = () => editarRegistro(b.dataset.id));
   $('slot-regs').querySelectorAll('.reg-del').forEach(b => b.onclick = () => excluirRegistro(b.dataset.id, b));
+  $('slot-regs').querySelectorAll('.reg-ver').forEach(b => b.onclick = () => abrirVisualizadorFoto(b.dataset.id));
+  $('slot-thumbs').querySelectorAll('.thumb-foto').forEach(t => t.onclick = () => abrirVisualizadorFoto(t.dataset.id));
+  preencherThumbsFoto(regs.filter(r => r.tipo === 'foto'));
 }
+
+/* ---------- carrega a imagem real nas miniaturas de foto (assíncrono, não bloqueia o render) ---------- */
+let thumbURLsAtivas = [];
+async function preencherThumbsFoto(regsFoto) {
+  thumbURLsAtivas.forEach(u => URL.revokeObjectURL(u));
+  thumbURLsAtivas = [];
+  for (const r of regsFoto) {
+    const blob = await obterBlobMidia(oc.id, r.arquivo);
+    if (!blob) continue;
+    const url = URL.createObjectURL(blob);
+    thumbURLsAtivas.push(url);
+    const el = $('slot-thumbs').querySelector(`.thumb-foto[data-id="${r.id}"]`);
+    if (el) el.innerHTML = `<img src="${url}" alt="">`;
+  }
+}
+
+/* ---------- visualizador de foto em tela cheia — mostra a foto JÁ carimbada, na hora ---------- */
+let fotoViewURL = null;
+async function abrirVisualizadorFoto(regId) {
+  const r = oc.registros.find(x => x.id === regId);
+  if (!r || r.tipo !== 'foto') return;
+  const blob = await obterBlobMidia(oc.id, r.arquivo);
+  if (!blob) { alert('Foto não encontrada no aparelho.'); return; }
+  if (fotoViewURL) URL.revokeObjectURL(fotoViewURL);
+  fotoViewURL = URL.createObjectURL(blob);
+  $('foto-full').src = fotoViewURL;
+  $('foto-legenda').textContent = (r.carimbo_visual ? '📍 carimbo visual aplicado' : '⚠️ sem carimbo (foto da galeria)') + ' · ' + hhmm(r.t);
+  $('tela-foto').classList.add('on');
+}
+function fecharVisualizadorFoto() {
+  $('tela-foto').classList.remove('on');
+  if (fotoViewURL) { URL.revokeObjectURL(fotoViewURL); fotoViewURL = null; }
+  $('foto-full').src = '';
+}
+$('foto-fechar').onclick = fecharVisualizadorFoto;
 
 /* ---------- player de áudio estilo bolha de voz (play/pause + seek pela waveform) ---------- */
 function pararAudio() {
@@ -1048,9 +1113,12 @@ function capturarMidia(pid, tipo, fromCamera) {
     const ext = extPara(tipo, mimeFinal);
     const seq = String(oc.registros.length + 1).padStart(2,'0');
     const arquivo = `midia/${pid}/${seq}_${tipo}_${Date.now()}.${ext}`;
-    oc.registros.push({ id: novoId(), arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: mimeFinal, legenda: null, campos_alvo: p.campos, carimbo_visual: carimbada });
+    const regId = novoId();
+    oc.registros.push({ id: regId, arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: mimeFinal, legenda: null, campos_alvo: p.campos, carimbo_visual: carimbada });
     await put('midia', midiaFinal, oc.id + '/' + arquivo);
     await salvarOc(); renderSlotSheet();
+    // mostra a foto (já carimbada) na hora, pra conferir o resultado sem precisar exportar nada
+    if (tipo === 'foto') abrirVisualizadorFoto(regId);
   };
   input.click();
 }
