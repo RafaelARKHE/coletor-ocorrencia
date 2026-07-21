@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.5 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 3.0 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -114,6 +114,26 @@
            display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex: 0 0 auto; overflow: hidden; padding: 0; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb-add { border: 1px dashed var(--line); color: var(--muted); font-size: .9rem; }
+
+  /* ---------- câmera própria (getUserMedia) — carimbo ao vivo, não recarrega a página ---------- */
+  #tela-camera { position: fixed; inset: 0; background: #000; display: none; flex-direction: column; z-index: 70; }
+  #tela-camera.on { display: flex; }
+  .cam-palco { position: relative; flex: 1; overflow: hidden; background: #000; }
+  #cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #cam-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .cam-topo { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center;
+              padding: calc(12px + env(safe-area-inset-top)) 16px 12px; z-index: 2; }
+  .cam-topo button { width: auto; padding: 8px 14px; background: rgba(13,17,18,.6); border: 1px solid rgba(255,255,255,.25); color: #fff; }
+  .cam-status { font-family: var(--font-dado); font-size: .66rem; text-transform: uppercase; letter-spacing: .1em;
+                color: #fff; background: rgba(13,17,18,.6); border-radius: 999px; padding: 5px 11px; }
+  .cam-status.ok { color: var(--verde); }
+  .cam-status.esperando { color: var(--amarelo); }
+  .cam-barra { display: flex; align-items: center; justify-content: center; gap: 40px;
+               padding: 18px 20px calc(24px + env(safe-area-inset-bottom)); background: #000; }
+  #cam-disparo { width: 74px; height: 74px; border-radius: 50%; background: #fff; border: 4px solid rgba(255,255,255,.4);
+                 padding: 0; flex: 0 0 auto; box-shadow: 0 0 0 3px #000 inset; }
+  #cam-disparo:active { transform: scale(.94); }
+  #cam-disparo:disabled { opacity: .4; }
 
   /* ---------- visualizador de foto em tela cheia (a foto JÁ carimbada, tirada pelo Coletor) ---------- */
   #tela-foto { position: fixed; inset: 0; background: rgba(13,17,18,.97); display: none;
@@ -323,6 +343,21 @@
       <button class="consulta" id="rec-digitar">digitar</button>
       <button id="rec-stop">⏹ Concluir</button>
     </div>
+  </div>
+</div>
+
+<!-- câmera própria (getUserMedia) com carimbo ao vivo -->
+<div id="tela-camera">
+  <div class="cam-palco">
+    <video id="cam-video" playsinline autoplay muted></video>
+    <canvas id="cam-overlay"></canvas>
+    <div class="cam-topo">
+      <button id="cam-fechar">✕</button>
+      <span class="cam-status esperando" id="cam-status">GPS…</span>
+    </div>
+  </div>
+  <div class="cam-barra">
+    <button id="cam-disparo" aria-label="Tirar foto"></button>
   </div>
 </div>
 
@@ -585,6 +620,15 @@ async function carimbarFoto(file, geo) {
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(bitmap, 0, 0, W, H);
+  await desenharCarimbo(canvas, geo);
+  return new Promise(res => canvas.toBlob(b => res(b || null), 'image/jpeg', 0.88));
+}
+
+/* Aplica o carimbo visual sobre um canvas que JÁ tem a imagem desenhada (foto de arquivo ou
+   frame da câmera própria). Faz as buscas de rede (endereço + tile) best-effort. Mutação in-place. */
+async function desenharCarimbo(canvas, geo) {
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
 
   const pad = W * 0.035;
   const agora = new Date();
@@ -681,8 +725,6 @@ async function carimbarFoto(file, geo) {
     ctx.fillStyle = '#c0392b'; ctx.fill();
     ctx.lineWidth = wM * 0.012; ctx.strokeStyle = '#fff'; ctx.stroke();
   }
-
-  return new Promise(res => canvas.toBlob(b => res(b || null), 'image/jpeg', 0.88));
 }
 
 /* ================= TELA 1: setup ================= */
@@ -1017,6 +1059,150 @@ function fecharVisualizadorFoto() {
 }
 $('foto-fechar').onclick = fecharVisualizadorFoto;
 
+/* ================= câmera própria (getUserMedia) =================
+   Substitui o <input capture> para foto: mantém a página VIVA (o iOS recarrega a PWA standalone
+   ao voltar da câmera nativa, perdendo a foto) e permite o carimbo AO VIVO na tela. */
+let camStream = null, camPid = null, camGeoWatch = null, camGeo = null, camRAF = null;
+
+async function abrirCamera(pid) {
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('⚠️ Sem HTTPS o iPhone bloqueia a câmera.\nAbra o app pelo endereço https:// adicionado à Tela de Início.');
+    return;
+  }
+  camPid = pid;
+  pedirBussola();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } },
+      audio: false
+    });
+  } catch (e) {
+    alert('Não consegui abrir a câmera: ' + (e && e.message ? e.message : e) + '\n\nVocê pode usar "Da galeria" como alternativa.');
+    camPid = null; return;
+  }
+  const video = $('cam-video');
+  video.srcObject = camStream;
+  try { await video.play(); } catch (e) {}
+  $('tela-camera').classList.add('on');
+  $('cam-disparo').disabled = false;
+
+  // GPS ao vivo — mantém coordenadas frescas pro overlay e pra captura
+  camGeo = null;
+  atualizarStatusCam();
+  if (navigator.geolocation) {
+    camGeoWatch = navigator.geolocation.watchPosition(
+      p => {
+        camGeo = {
+          lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6),
+          precisao_m: Math.round(p.coords.accuracy),
+          altitude_m: (typeof p.coords.altitude === 'number' && !Number.isNaN(p.coords.altitude)) ? Math.round(p.coords.altitude) : null,
+          velocidade_kmh: (typeof p.coords.speed === 'number' && p.coords.speed >= 0) ? Math.round(p.coords.speed * 3.6) : null,
+          heading_graus: (typeof p.coords.heading === 'number' && !Number.isNaN(p.coords.heading)) ? Math.round(p.coords.heading)
+                         : (headingAtual != null ? Math.round(headingAtual) : null)
+        };
+        atualizarStatusCam();
+      },
+      () => { atualizarStatusCam(); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 });
+  }
+  loopOverlayCam();
+}
+
+function atualizarStatusCam() {
+  const s = $('cam-status');
+  if (camGeo) { s.textContent = `GPS ±${camGeo.precisao_m}m`; s.className = 'cam-status ok'; }
+  else { s.textContent = 'GPS…'; s.className = 'cam-status esperando'; }
+}
+
+/* Overlay ao vivo (leve): bloco de texto + rosa dos ventos, atualizado a cada frame. É só PREVIEW —
+   o carimbo definitivo é aplicado em alta resolução no disparo (desenharCarimbo). */
+function loopOverlayCam() {
+  const video = $('cam-video'), cv = $('cam-overlay');
+  const palco = cv.parentElement;
+  const W = palco.clientWidth, H = palco.clientHeight;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = W * 0.04;
+  const agora = new Date();
+  const dataFmt = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '');
+  const linhas = [`${dataFmt} ${agora.toTimeString().slice(0, 8)}`,
+                  camGeo ? `${paraDMS(camGeo.lat, true)} ${paraDMS(camGeo.lon, false)}` : 'aguardando GPS…'];
+  if (camGeo && typeof camGeo.heading_graus === 'number') linhas.push(`${camGeo.heading_graus}° ${grausParaCardeal(camGeo.heading_graus)}`);
+  if (camGeo && camGeo.altitude_m != null) linhas.push(`Alt: ${camGeo.altitude_m}m · ${camGeo.velocidade_kmh != null ? camGeo.velocidade_kmh + 'km/h' : ''}`);
+  linhas.push('#CBMPA');
+
+  const fonte = Math.max(12, W * 0.035);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
+  ctx.font = `700 ${Math.round(fonte)}px sans-serif`;
+  let y = H - pad;
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    if (!linhas[i]) { continue; }
+    ctx.lineWidth = fonte * 0.18; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.strokeText(linhas[i], W - pad, y);
+    ctx.fillStyle = '#fff'; ctx.fillText(linhas[i], W - pad, y);
+    y -= fonte * 1.4;
+  }
+  // rosa dos ventos (canto sup. esq.)
+  const d = W * 0.16, cx = pad + d / 2, cy = pad + d / 2 + (W * 0.04), r = d / 2;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,17,18,.5)'; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(d * 0.16)}px sans-serif`;
+  ctx.fillText('N', cx, cy - r * 0.72); ctx.fillText('S', cx, cy + r * 0.72);
+  ctx.fillText('L', cx + r * 0.72, cy); ctx.fillText('W', cx - r * 0.72, cy);
+  if (headingAtual != null) {
+    const ang = headingAtual * Math.PI / 180;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0, -r * 0.6); ctx.lineTo(r * 0.16, r * 0.3); ctx.lineTo(0, r * 0.12); ctx.lineTo(-r * 0.16, r * 0.3); ctx.closePath();
+    ctx.fillStyle = '#e0692e'; ctx.fill(); ctx.restore();
+  }
+  camRAF = requestAnimationFrame(loopOverlayCam);
+}
+
+async function dispararFoto() {
+  const video = $('cam-video');
+  if (!video.videoWidth) { alert('Câmera ainda carregando — tente de novo em 1s.'); return; }
+  $('cam-disparo').disabled = true;
+  const geo = camGeo; // congela a leitura do instante do disparo
+  try {
+    const W = video.videoWidth, H = video.videoHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    canvas.getContext('2d').drawImage(video, 0, 0, W, H);
+    await desenharCarimbo(canvas, geo);
+    const blob = await new Promise(res => canvas.toBlob(b => res(b || null), 'image/jpeg', 0.9));
+    if (!blob) { alert('Falha ao gerar a foto.'); $('cam-disparo').disabled = false; return; }
+
+    const p = SCHEMA.papeis[camPid];
+    const seq = String(oc.registros.length + 1).padStart(2, '0');
+    const arquivo = `midia/${camPid}/${seq}_foto_${Date.now()}.jpg`;
+    const regId = novoId();
+    oc.registros.push({ id: regId, arquivo, slot: camPid, tipo: 'foto', t: agoraISO(), geo, mime: 'image/jpeg', legenda: null, campos_alvo: p.campos, carimbo_visual: true });
+    await put('midia', blob, oc.id + '/' + arquivo);
+    await salvarOc();
+    fecharCamera();
+    renderSlotSheet();
+    abrirVisualizadorFoto(regId);
+  } catch (e) {
+    alert('Erro ao tirar a foto: ' + (e && e.message ? e.message : e));
+    $('cam-disparo').disabled = false;
+  }
+}
+
+function fecharCamera() {
+  if (camRAF) { cancelAnimationFrame(camRAF); camRAF = null; }
+  if (camGeoWatch != null && navigator.geolocation) { navigator.geolocation.clearWatch(camGeoWatch); camGeoWatch = null; }
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  const video = $('cam-video'); video.srcObject = null;
+  $('tela-camera').classList.remove('on');
+  camPid = null; camGeo = null;
+}
+$('cam-disparo').onclick = dispararFoto;
+$('cam-fechar').onclick = fecharCamera;
+
 /* ---------- player de áudio estilo bolha de voz (play/pause + seek pela waveform) ---------- */
 function pararAudio() {
   if (audioTocando) { audioTocando.pause(); URL.revokeObjectURL(audioTocando.src); }
@@ -1071,7 +1257,7 @@ function aplicarSeek(wave, e) {
 
 $('slot-audio').onclick = () => slotAtual && gravar(slotAtual);
 $('slot-texto').onclick = () => slotAtual && digitarNota(slotAtual);
-$('slot-foto').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', true);
+$('slot-foto').onclick = () => slotAtual && abrirCamera(slotAtual);
 $('slot-foto-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', false);
 $('slot-video').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', true);
 $('slot-video-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', false);
