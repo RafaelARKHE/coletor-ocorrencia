@@ -440,9 +440,10 @@ function pegarGeo() {
 
 /* ================= bússola do carimbo (orientação do aparelho, best-effort) =================
    iOS exige DeviceOrientationEvent.requestPermission() disparado por gesto do usuário — por isso
-   é pedida no toque do botão "Tirar foto", nunca no carregamento da página. Android não pede
-   permissão à parte (geolocation cobre). Sem sinal de nenhum dos dois, o carimbo omite a seta e
-   mostra só a rosa dos ventos — nunca inventa direção. */
+   é pedida no toque de "Iniciar ocorrência", NUNCA junto do toque em "Tirar foto": encadear dois
+   pedidos de permissão (bússola + câmera) no mesmo gesto faz o iOS engolir o 2º e a câmera não
+   abre. Android não pede permissão à parte (geolocation cobre). Sem sinal de nenhum dos dois,
+   o carimbo omite a seta e mostra só a rosa dos ventos — nunca inventa direção. */
 let headingAtual = null;
 function onOrientacaoDispositivo(e) {
   let h = null;
@@ -717,6 +718,8 @@ async function renderAbertas() {
 }
 
 $('b-iniciar').onclick = async () => {
+  pedirBussola(); // gesto próprio, separado do toque em "Tirar foto" — no iOS, 2 pedidos de permissão
+                   // encadeados no mesmo toque fazem o 2º (a câmera) não abrir
   const tipo = SCHEMA.tipos.find(t => t.id === selTipo);
   oc = { id: 'oc_' + Date.now(), tipo: tipo.id, rotulo_tipo: tipo.rotulo.replace(/^\S+\s/, ''),
          natureza_sinesp: tipo.natureza_sinesp, funcao: selFuncao, vtr: $('in-vtr').value.trim() || null,
@@ -991,7 +994,7 @@ function aplicarSeek(wave, e) {
 
 $('slot-audio').onclick = () => slotAtual && gravar(slotAtual);
 $('slot-texto').onclick = () => slotAtual && digitarNota(slotAtual);
-$('slot-foto').onclick = () => { pedirBussola(); slotAtual && capturarMidia(slotAtual, 'foto', true); };
+$('slot-foto').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', true);
 $('slot-foto-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'foto', false);
 $('slot-video').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', true);
 $('slot-video-lib').onclick = () => slotAtual && capturarMidia(slotAtual, 'video', false);
