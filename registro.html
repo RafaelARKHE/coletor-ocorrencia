@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.4 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 2.5 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -511,13 +511,25 @@ function carregarImagem(url, timeoutMs) {
 carregarImagem('brasao-cbmpa.png', 6000).then(img => { imgBrasao = img; });
 
 async function carregarBitmapFoto(file) {
+  // createImageBitmap com corrida contra timeout: no iOS ele pode rejeitar (ou, raro, pendurar)
+  // em HEIC — nunca deixar o decode bloquear a captura.
   if (window.createImageBitmap) {
-    try { return await createImageBitmap(file); } catch (e) {}
+    try {
+      const bmp = await Promise.race([
+        createImageBitmap(file),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout createImageBitmap')), 8000))
+      ]);
+      if (bmp) return bmp;
+    } catch (e) {}
   }
+  // fallback <img>: TEM que ter timeout — um blob HEIC pode não disparar onload nem onerror no iOS,
+  // e sem isso a Promise ficaria pendurada pra sempre (era a causa da "foto que não fazia nada").
   return new Promise(res => {
     const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = () => res(null);
+    let feito = false;
+    const t = setTimeout(() => { if (!feito) { feito = true; res(null); } }, 8000);
+    img.onload = () => { if (!feito) { feito = true; clearTimeout(t); res(img); } };
+    img.onerror = () => { if (!feito) { feito = true; clearTimeout(t); res(null); } };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -1101,24 +1113,44 @@ function capturarMidia(pid, tipo, fromCamera) {
   input.type = 'file';
   input.accept = tipo === 'foto' ? 'image/*' : 'video/*';
   if (fromCamera) input.capture = 'environment';
+  // iOS standalone (tela de início): o input PRECISA estar no DOM, senão o onchange às vezes
+  // não dispara ao voltar da câmera (era um dos suspeitos do "bati a foto e nada acontece").
+  input.style.position = 'fixed'; input.style.left = '-9999px'; input.style.opacity = '0';
+  document.body.appendChild(input);
+  const limpar = () => { try { input.remove(); } catch (e) {} };
   input.onchange = async () => {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const geo = await pegarGeo();
-    let midiaFinal = file, mimeFinal = file.type, carimbada = false;
-    if (tipo === 'foto' && fromCamera) {
-      const stamped = await carimbarFoto(file, geo);
-      if (stamped) { midiaFinal = stamped; mimeFinal = 'image/jpeg'; carimbada = true; }
+    try {
+      const file = input.files && input.files[0];
+      if (!file) { limpar(); return; }
+      const geo = await pegarGeo();
+      const seq = String(oc.registros.length + 1).padStart(2,'0');
+      const regId = novoId();
+      const mimeFinal = file.type || (tipo === 'foto' ? 'image/jpeg' : 'video/mp4');
+      const arquivo = `midia/${pid}/${seq}_${tipo}_${Date.now()}.${extPara(tipo, mimeFinal)}`;
+      // 1) grava o ORIGINAL primeiro — a foto NUNCA se perde, mesmo se o carimbo falhar ou travar.
+      oc.registros.push({ id: regId, arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: mimeFinal, legenda: null, campos_alvo: p.campos, carimbo_visual: false });
+      await put('midia', file, oc.id + '/' + arquivo);
+      await salvarOc(); renderSlotSheet();
+      // 2) mostra a foto na hora (ainda sem carimbo) — feedback imediato, nunca tela morta.
+      if (tipo === 'foto') abrirVisualizadorFoto(regId);
+      // 3) carimbo como MELHORIA best-effort: se der certo, substitui a mídia e reabre já carimbada.
+      if (tipo === 'foto' && fromCamera) {
+        try {
+          const stamped = await carimbarFoto(file, geo);
+          if (stamped) {
+            const reg = oc.registros.find(x => x.id === regId);
+            if (reg) { reg.mime = 'image/jpeg'; reg.carimbo_visual = true; }
+            await put('midia', stamped, oc.id + '/' + arquivo);
+            await salvarOc(); renderSlotSheet();
+            if ($('tela-foto').classList.contains('on')) abrirVisualizadorFoto(regId);
+          }
+        } catch (e) { /* mantém o original sem carimbo — melhor foto crua que foto nenhuma */ }
+      }
+    } catch (e) {
+      alert('Falha ao salvar a mídia: ' + (e && e.message ? e.message : e));
+    } finally {
+      limpar();
     }
-    const ext = extPara(tipo, mimeFinal);
-    const seq = String(oc.registros.length + 1).padStart(2,'0');
-    const arquivo = `midia/${pid}/${seq}_${tipo}_${Date.now()}.${ext}`;
-    const regId = novoId();
-    oc.registros.push({ id: regId, arquivo, slot: pid, tipo, t: agoraISO(), geo, mime: mimeFinal, legenda: null, campos_alvo: p.campos, carimbo_visual: carimbada });
-    await put('midia', midiaFinal, oc.id + '/' + arquivo);
-    await salvarOc(); renderSlotSheet();
-    // mostra a foto (já carimbada) na hora, pra conferir o resultado sem precisar exportar nada
-    if (tipo === 'foto') abrirVisualizadorFoto(regId);
   };
   input.click();
 }
