@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 3.0 -->
+<!-- sistema: Nexus | tipo: documento_oficial | disciplina: — | sigla: OPS | periodo: — | criado_em: 08/07/2026 | atualizado_em: 21/07/2026 | versao: 3.1 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -638,7 +638,7 @@ async function desenharCarimbo(canvas, geo) {
   // endereço + tile do mini-mapa: best-effort, só com geo válida e rede — nunca trava o carimbo
   let linhasEndereco = null, tile = null, pinFrac = null;
   if (geo && navigator.onLine) {
-    const zoom = 17;
+    const zoom = 16; // 1 nível a menos que antes = dobro de área visível — o cadete achou 17 apertado demais pra se situar
     const { x, y } = lonLatParaTile(geo.lon, geo.lat, zoom);
     const tx = Math.floor(x), ty = Math.floor(y);
     pinFrac = { x: (x - tx) * 256, y: (y - ty) * 256 };
@@ -712,7 +712,7 @@ async function desenharCarimbo(canvas, geo) {
     ctx.moveTo(xM + raio, yM); ctx.arcTo(xM + wM, yM, xM + wM, yM + hM, raio);
     ctx.arcTo(xM + wM, yM + hM, xM, yM + hM, raio); ctx.arcTo(xM, yM + hM, xM, yM, raio); ctx.arcTo(xM, yM, xM + wM, yM, raio);
     ctx.closePath(); ctx.clip();
-    const escala = wM / 160; // recorte de ~160px do tile — mais "zoom" visual que o tile inteiro
+    const escala = wM / 220; // recorte de ~220px do tile (era 160) — campo de visão mais aberto
     const offX = xM + wM / 2 - pinFrac.x * escala, offY = yM + hM / 2 - pinFrac.y * escala;
     ctx.drawImage(tile, offX, offY, 256 * escala, 256 * escala);
     ctx.restore();
